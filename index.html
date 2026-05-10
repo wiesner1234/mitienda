@@ -654,43 +654,32 @@ select option{background:var(--s3)}
 </div><!-- /pages -->
 </div><!-- /app-body -->
 
-<!-- SCANNER — usa cámara nativa del celular para máxima compatibilidad -->
+<!-- SCANNER -->
 <div class="scan-ov" id="scan-ov">
-  <!-- Input oculto que abre la cámara nativa -->
   <input type="file" id="scan-file-input" accept="image/*" capture="environment" style="display:none" onchange="processScanImage(this)">
+  <video id="scan-video" autoplay playsinline muted style="width:100%;flex:1;object-fit:cover;display:block"></video>
+  <canvas id="scan-canvas" style="display:none"></canvas>
 
-  <!-- Vista de cámara en vivo (fallback para desktop) -->
-  <video id="scan-video" autoplay playsinline muted style="display:none"></video>
+  <!-- Marco de guía -->
+  <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+    <div style="width:260px;height:160px;border:3px solid var(--grn);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.55);position:relative">
+      <!-- esquinas decorativas -->
+      <div style="position:absolute;top:-3px;left:-3px;width:20px;height:20px;border-top:4px solid #fff;border-left:4px solid #fff;border-radius:3px 0 0 0"></div>
+      <div style="position:absolute;top:-3px;right:-3px;width:20px;height:20px;border-top:4px solid #fff;border-right:4px solid #fff;border-radius:0 3px 0 0"></div>
+      <div style="position:absolute;bottom:-3px;left:-3px;width:20px;height:20px;border-bottom:4px solid #fff;border-left:4px solid #fff;border-radius:0 0 0 3px"></div>
+      <div style="position:absolute;bottom:-3px;right:-3px;width:20px;height:20px;border-bottom:4px solid #fff;border-right:4px solid #fff;border-radius:0 0 3px 0"></div>
+    </div>
+  </div>
 
-  <div class="scan-ui" id="scan-ui-main">
-    <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:24px;pointer-events:all">
-
-      <!-- Opción 1: Cámara nativa -->
-      <button onclick="abrirCamaraNativa()" style="background:var(--grn);border:none;border-radius:16px;color:#001a0f;font-weight:700;font-size:16px;padding:18px 32px;cursor:pointer;display:flex;align-items:center;gap:10px;width:260px;justify-content:center">
-        📷 Abrir cámara
-      </button>
-      <div style="font-size:11px;color:rgba(255,255,255,.4)">Toma una foto clara del código de barras</div>
-
-      <!-- Divider -->
-      <div style="width:260px;display:flex;align-items:center;gap:10px">
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.1)"></div>
-        <span style="font-size:11px;color:rgba(255,255,255,.3)">o</span>
-        <div style="flex:1;height:1px;background:rgba(255,255,255,.1)"></div>
-      </div>
-
-      <!-- Opción 2: Ingreso manual -->
-      <div style="width:260px">
-        <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-align:center">Ingresa el código manualmente</div>
-        <div style="display:flex;gap:6px">
-          <input id="manual-bc-input" placeholder="Código de barras..." style="flex:1;background:rgba(0,0,0,.8);border:2px solid var(--bd2);border-radius:8px;color:#fff;padding:10px 12px;font-size:15px;outline:none;font-family:var(--mono)"
-            onfocus="this.style.borderColor='var(--grn)'" onblur="this.style.borderColor='var(--bd2)'"
-            onkeydown="if(event.key==='Enter'&&this.value.trim())submitManualBarcode()">
-          <button onclick="submitManualBarcode()" style="background:var(--grn);border:none;border-radius:8px;color:#001a0f;font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">OK</button>
-        </div>
-      </div>
-
-      <!-- Estado de procesamiento -->
-      <div id="scan-status" style="font-size:12px;color:var(--grn);min-height:20px;text-align:center"></div>
+  <!-- Controles inferiores -->
+  <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.8);padding:16px;display:flex;flex-direction:column;align-items:center;gap:10px">
+    <!-- Botón capturar -->
+    <button id="capture-btn" onclick="capturarFrame()" style="width:64px;height:64px;border-radius:50%;background:var(--grn);border:4px solid #fff;cursor:pointer;font-size:24px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 20px rgba(0,229,160,.4)">📷</button>
+    <div id="scan-status" style="font-size:12px;color:var(--grn);min-height:16px;text-align:center"></div>
+    <!-- Manual -->
+    <div style="display:flex;gap:6px;width:100%;max-width:300px">
+      <input id="manual-bc-input" placeholder="O escribe el código manualmente..." style="flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;color:#fff;padding:8px 10px;font-size:13px;outline:none;font-family:var(--mono)" onkeydown="if(event.key==='Enter'&&this.value.trim())submitManualBarcode()">
+      <button onclick="submitManualBarcode()" style="background:var(--grn);border:none;border-radius:8px;color:#001a0f;font-weight:700;font-size:12px;padding:8px 12px;cursor:pointer">OK</button>
     </div>
   </div>
 
@@ -1311,9 +1300,12 @@ function scanForField(fid){scanFieldMode=true;scanFieldTarget=fid;startScanner()
 let zxingReader=null;
 
 function startScanner(){
-  document.getElementById('scan-ov').classList.add('open');
+  const ov=document.getElementById('scan-ov');
+  ov.classList.add('open');
   document.getElementById('manual-bc-input').value='';
-  document.getElementById('scan-status').textContent='';
+  document.getElementById('scan-status').textContent='Encuadra el código y toca 📷';
+
+  // Inicializar ZXing
   if(window.ZXing&&!zxingReader){
     try{
       const hints=new Map();
@@ -1321,61 +1313,134 @@ function startScanner(){
       zxingReader=new ZXing.BrowserMultiFormatReader(hints);
     }catch(e){zxingReader=null;}
   }
+
+  // Iniciar stream de cámara
+  if(!navigator.mediaDevices){return;}
+  navigator.mediaDevices.getUserMedia({
+    video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}
+  }).then(stream=>{
+    scannerStream=stream;scannerActive=true;
+    const v=document.getElementById('scan-video');
+    v.srcObject=stream;v.play();
+    // foco continuo
+    const track=stream.getVideoTracks()[0];
+    if(track) track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+  }).catch(()=>{
+    // sin permisos de cámara — solo modo manual
+    document.getElementById('scan-video').style.display='none';
+    document.getElementById('capture-btn').style.display='none';
+    document.getElementById('scan-status').textContent='Sin acceso a cámara — usa el campo manual';
+  });
+}
+
+async function capturarFrame(){
+  const v=document.getElementById('scan-video');
+  const canvas=document.getElementById('scan-canvas');
+  const status=document.getElementById('scan-status');
+
+  if(!v.srcObject||v.readyState<2){
+    // Si no hay video, abrir cámara nativa como foto
+    document.getElementById('scan-file-input').click();
+    return;
+  }
+
+  // Pausar foco un momento para captura nítida
+  const track=scannerStream&&scannerStream.getVideoTracks()[0];
+  if(track) await track.applyConstraints({advanced:[{focusMode:'single-shot'}]}).catch(()=>{});
+
+  // Esperar 600ms a que enfoque
+  await new Promise(r=>setTimeout(r,600));
+
+  // Capturar frame del video al canvas
+  canvas.width=v.videoWidth||1280;
+  canvas.height=v.videoHeight||720;
+  const ctx=canvas.getContext('2d');
+  ctx.drawImage(v,0,0,canvas.width,canvas.height);
+
+  status.style.color='var(--grn)';
+  status.textContent='🔍 Procesando...';
+
+  // Intentar leer con ZXing desde el canvas
+  if(window.ZXing&&zxingReader){
+    try{
+      // Convertir canvas a blob y luego a URL
+      canvas.toBlob(async blob=>{
+        const url=URL.createObjectURL(blob);
+        try{
+          const result=await zxingReader.decodeFromImageUrl(url);
+          URL.revokeObjectURL(url);
+          if(navigator.vibrate)navigator.vibrate([100,50,100]);
+          status.textContent='✓ ¡Código encontrado!';
+          setTimeout(()=>handleBarcode(result.getText()),400);
+        }catch(e){
+          URL.revokeObjectURL(url);
+          status.style.color='var(--amb)';
+          status.textContent='No detectado — acércate más o usa el campo manual ↓';
+          // Reanudar foco continuo
+          if(track) track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+          setTimeout(()=>document.getElementById('manual-bc-input').focus(),300);
+        }
+      },'image/jpeg',0.95);
+    }catch(e){
+      status.style.color='var(--amb)';
+      status.textContent='Error — usa el campo manual ↓';
+    }
+  } else {
+    status.style.color='var(--amb)';
+    status.textContent='Usa el campo manual ↓';
+    setTimeout(()=>document.getElementById('manual-bc-input').focus(),200);
+  }
+}
+
+async function processScanImage(input){
+  if(!input.files||!input.files[0])return;
+  const status=document.getElementById('scan-status');
+  status.style.color='var(--grn)';
+  status.textContent='🔍 Leyendo...';
+  const url=URL.createObjectURL(input.files[0]);
+  input.value='';
+  if(window.ZXing&&zxingReader){
+    try{
+      const result=await zxingReader.decodeFromImageUrl(url);
+      URL.revokeObjectURL(url);
+      if(navigator.vibrate)navigator.vibrate(100);
+      setTimeout(()=>handleBarcode(result.getText()),300);
+      return;
+    }catch(e){URL.revokeObjectURL(url);}
+  }
+  status.style.color='var(--amb)';
+  status.textContent='No detectado — ingresa manualmente ↓';
+  setTimeout(()=>document.getElementById('manual-bc-input').focus(),100);
 }
 
 function abrirCamaraNativa(){
   document.getElementById('scan-file-input').click();
 }
 
-async function processScanImage(input){
-  if(!input.files||!input.files[0])return;
-  const file=input.files[0];
-  const status=document.getElementById('scan-status');
-  status.style.color='var(--grn)';
-  status.textContent='🔍 Leyendo código...';
-  try{
-    const imageUrl=URL.createObjectURL(file);
-    if(window.ZXing&&zxingReader){
-      try{
-        const result=await zxingReader.decodeFromImageUrl(imageUrl);
-        URL.revokeObjectURL(imageUrl);
-        input.value='';
-        if(navigator.vibrate)navigator.vibrate(100);
-        status.textContent='✓ Código encontrado';
-        setTimeout(()=>handleBarcode(result.getText()),300);
-        return;
-      }catch(e){/* no encontró */}
-    }
-    URL.revokeObjectURL(imageUrl);
-    input.value='';
-    status.style.color='var(--amb)';
-    status.textContent='No se detectó. Ingrésalo manualmente ↓';
-    setTimeout(()=>document.getElementById('manual-bc-input').focus(),100);
-  }catch(e){
-    status.textContent='Error al procesar la imagen.';
-    input.value='';
-  }
-}
-
 function submitManualBarcode(){
-  const inp=document.getElementById('manual-bc-input');
-  const code=inp.value.trim();
+  const code=document.getElementById('manual-bc-input').value.trim();
   if(!code)return;
   handleBarcode(code);
 }
 
-function toggleTorch(){}
+function toggleTorch(){
+  if(!scannerStream)return;
+  const track=scannerStream.getVideoTracks()[0];if(!track)return;
+  const cur=track.getSettings().torch||false;
+  track.applyConstraints({advanced:[{torch:!cur}]}).catch(()=>{});
+}
 
 function handleBarcode(code){
-  if(scanFieldMode){document.getElementById(scanFieldTarget).value=code;closeScanner();showToast('Código: '+code);return;}
+  if(scanFieldMode){document.getElementById(scanFieldTarget).value=code;closeScanner();showToast('✓ Código: '+code);return;}
   const ex=S.productos.find(p=>p.barcode===code);
   closeScanner();
   if(ex){
     if(activePage==='caja'){addToTicket(ex.id);showToast('✓ '+ex.nombre+' agregado');}
-    else{editProd(ex.id);showToast('Producto encontrado');}
+    else{editProd(ex.id);showToast('Producto encontrado: '+ex.nombre);}
   }else{
-    document.getElementById('mp-bc').value=code;document.getElementById('mp-id').value='';
-    document.getElementById('mp-t').textContent='Nuevo — código: '+code;
+    document.getElementById('mp-bc').value=code;
+    document.getElementById('mp-id').value='';
+    document.getElementById('mp-t').textContent='Nuevo producto — código: '+code;
     document.getElementById('m-prod').classList.add('open');
     showToast('Código nuevo — completa los datos');
   }

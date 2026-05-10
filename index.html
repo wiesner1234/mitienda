@@ -654,23 +654,47 @@ select option{background:var(--s3)}
 </div><!-- /pages -->
 </div><!-- /app-body -->
 
-<!-- SCANNER -->
+<!-- SCANNER — usa cámara nativa del celular para máxima compatibilidad -->
 <div class="scan-ov" id="scan-ov">
-  <video id="scan-video" autoplay playsinline muted></video>
-  <div class="scan-ui">
-    <div class="scan-frame"><div class="scan-line"></div></div>
-    <div class="scan-lbl" id="scan-lbl">Apunta al código de barras</div>
-  </div>
-  <button class="scan-close" onclick="closeScanner()">✕</button>
-  <button id="torch-btn" onclick="toggleTorch()" style="display:none;position:absolute;top:16px;left:16px;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid var(--bd2);color:var(--t1);font-size:18px;cursor:pointer;align-items:center;justify-content:center;pointer-events:all">🔦</button>
-  <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.5);color:rgba(255,255,255,.5);font-size:10px;padding:4px 10px;border-radius:10px;white-space:nowrap;pointer-events:none">Toca la pantalla para enfocar</div>
-  <div style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:all;width:280px">
-    <div style="font-size:11px;color:rgba(255,255,255,.5)">¿No lee el código? Ingrésalo manualmente:</div>
-    <div style="display:flex;gap:6px;width:100%">
-      <input id="manual-bc-input" placeholder="Escribe el código aquí..." style="flex:1;background:rgba(0,0,0,.8);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 12px;font-size:15px;outline:none">
-      <button onclick="submitManualBarcode()" style="background:var(--grn);border:none;border-radius:8px;color:#001a0f;font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">OK</button>
+  <!-- Input oculto que abre la cámara nativa -->
+  <input type="file" id="scan-file-input" accept="image/*" capture="environment" style="display:none" onchange="processScanImage(this)">
+
+  <!-- Vista de cámara en vivo (fallback para desktop) -->
+  <video id="scan-video" autoplay playsinline muted style="display:none"></video>
+
+  <div class="scan-ui" id="scan-ui-main">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:20px;padding:24px;pointer-events:all">
+
+      <!-- Opción 1: Cámara nativa -->
+      <button onclick="abrirCamaraNativa()" style="background:var(--grn);border:none;border-radius:16px;color:#001a0f;font-weight:700;font-size:16px;padding:18px 32px;cursor:pointer;display:flex;align-items:center;gap:10px;width:260px;justify-content:center">
+        📷 Abrir cámara
+      </button>
+      <div style="font-size:11px;color:rgba(255,255,255,.4)">Toma una foto clara del código de barras</div>
+
+      <!-- Divider -->
+      <div style="width:260px;display:flex;align-items:center;gap:10px">
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.1)"></div>
+        <span style="font-size:11px;color:rgba(255,255,255,.3)">o</span>
+        <div style="flex:1;height:1px;background:rgba(255,255,255,.1)"></div>
+      </div>
+
+      <!-- Opción 2: Ingreso manual -->
+      <div style="width:260px">
+        <div style="font-size:11px;color:rgba(255,255,255,.4);margin-bottom:8px;text-align:center">Ingresa el código manualmente</div>
+        <div style="display:flex;gap:6px">
+          <input id="manual-bc-input" placeholder="Código de barras..." style="flex:1;background:rgba(0,0,0,.8);border:2px solid var(--bd2);border-radius:8px;color:#fff;padding:10px 12px;font-size:15px;outline:none;font-family:var(--mono)"
+            onfocus="this.style.borderColor='var(--grn)'" onblur="this.style.borderColor='var(--bd2)'"
+            onkeydown="if(event.key==='Enter'&&this.value.trim())submitManualBarcode()">
+          <button onclick="submitManualBarcode()" style="background:var(--grn);border:none;border-radius:8px;color:#001a0f;font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">OK</button>
+        </div>
+      </div>
+
+      <!-- Estado de procesamiento -->
+      <div id="scan-status" style="font-size:12px;color:var(--grn);min-height:20px;text-align:center"></div>
     </div>
   </div>
+
+  <button class="scan-close" onclick="closeScanner()">✕</button>
 </div>
 
 <!-- MODALS -->
@@ -1288,92 +1312,60 @@ let zxingReader=null;
 
 function startScanner(){
   document.getElementById('scan-ov').classList.add('open');
-  if(!navigator.mediaDevices){alert('Usa Chrome en el celular para escanear');closeScanner();return;}
-
-  const v=document.getElementById('scan-video');
-  document.getElementById('scan-lbl').textContent='Apunta al código de barras';
-
-  // ZXing — mejor soporte en celulares
-  if(window.ZXing){
+  document.getElementById('manual-bc-input').value='';
+  document.getElementById('scan-status').textContent='';
+  if(window.ZXing&&!zxingReader){
     try{
       const hints=new Map();
-      const formats=[
-        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
-        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
-        ZXing.BarcodeFormat.QR_CODE
-      ];
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
-      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-
-      zxingReader = new ZXing.BrowserMultiFormatReader(hints);
-      zxingReader.decodeFromConstraints(
-        {video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}},
-        v,
-        (result, err)=>{
-          if(!scannerActive) return;
-          if(result){
-            if(navigator.vibrate) navigator.vibrate(100);
-            handleBarcode(result.getText());
-          }
-        }
-      ).then(controls=>{
-        scannerActive=true;
-        // Foco continuo
-        if(v.srcObject){
-          const track=v.srcObject.getVideoTracks()[0];
-          scannerStream=v.srcObject;
-          if(track){
-            track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
-            const caps=track.getCapabilities&&track.getCapabilities();
-            const torchBtn=document.getElementById('torch-btn');
-            if(torchBtn) torchBtn.style.display=(caps&&caps.torch)?'flex':'none';
-          }
-        }
-        // Tap para enfocar
-        v.onclick=()=>{
-          if(v.srcObject){
-            const t=v.srcObject.getVideoTracks()[0];
-            if(t) t.applyConstraints({advanced:[{focusMode:'single-shot'}]})
-              .then(()=>t.applyConstraints({advanced:[{focusMode:'continuous'}]}))
-              .catch(()=>{});
-          }
-        };
-      }).catch(err=>{
-        console.warn('ZXing error:',err);
-        fallbackScanner();
-      });
-    }catch(e){
-      console.warn('ZXing init error:',e);
-      fallbackScanner();
-    }
-  } else {
-    // Fallback sin librería
-    fallbackScanner();
+      hints.set(ZXing.DecodeHintType.TRY_HARDER,true);
+      zxingReader=new ZXing.BrowserMultiFormatReader(hints);
+    }catch(e){zxingReader=null;}
   }
 }
 
-function toggleTorch(){
-  if(!scannerStream)return;
-  const track=scannerStream.getVideoTracks()[0];if(!track)return;
-  const btn=document.getElementById('torch-btn');
-  const currentTorch=track.getSettings().torch||false;
-  track.applyConstraints({advanced:[{torch:!currentTorch}]})
-    .then(()=>{
-      btn.style.background=!currentTorch?'var(--amb)':'rgba(0,0,0,.6)';
-      btn.style.color=!currentTorch?'#000':'var(--t1)';
-    }).catch(()=>showToast('Linterna no disponible en este dispositivo'));
+function abrirCamaraNativa(){
+  document.getElementById('scan-file-input').click();
 }
 
-function fallbackScanner(){
-  document.getElementById('scan-lbl').textContent='Escáner no disponible — ingresa el código';
-  const inp=document.createElement('input');
-  inp.style.cssText='position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 14px;font-size:16px;text-align:center;z-index:10;width:220px;pointer-events:all;outline:none';
-  inp.placeholder='Escribe el código aquí';inp.id='mbi';
-  document.getElementById('scan-ov').appendChild(inp);
-  setTimeout(()=>inp.focus(),200);
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim())handleBarcode(inp.value.trim());});
+async function processScanImage(input){
+  if(!input.files||!input.files[0])return;
+  const file=input.files[0];
+  const status=document.getElementById('scan-status');
+  status.style.color='var(--grn)';
+  status.textContent='🔍 Leyendo código...';
+  try{
+    const imageUrl=URL.createObjectURL(file);
+    if(window.ZXing&&zxingReader){
+      try{
+        const result=await zxingReader.decodeFromImageUrl(imageUrl);
+        URL.revokeObjectURL(imageUrl);
+        input.value='';
+        if(navigator.vibrate)navigator.vibrate(100);
+        status.textContent='✓ Código encontrado';
+        setTimeout(()=>handleBarcode(result.getText()),300);
+        return;
+      }catch(e){/* no encontró */}
+    }
+    URL.revokeObjectURL(imageUrl);
+    input.value='';
+    status.style.color='var(--amb)';
+    status.textContent='No se detectó. Ingrésalo manualmente ↓';
+    setTimeout(()=>document.getElementById('manual-bc-input').focus(),100);
+  }catch(e){
+    status.textContent='Error al procesar la imagen.';
+    input.value='';
+  }
 }
+
+function submitManualBarcode(){
+  const inp=document.getElementById('manual-bc-input');
+  const code=inp.value.trim();
+  if(!code)return;
+  handleBarcode(code);
+}
+
+function toggleTorch(){}
+
 function handleBarcode(code){
   if(scanFieldMode){document.getElementById(scanFieldTarget).value=code;closeScanner();showToast('Código: '+code);return;}
   const ex=S.productos.find(p=>p.barcode===code);
@@ -1388,12 +1380,13 @@ function handleBarcode(code){
     showToast('Código nuevo — completa los datos');
   }
 }
+
 function closeScanner(){
   scannerActive=false;
-  if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}
+  if(zxingReader){try{zxingReader.reset();}catch(e){}}
   if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
-  const v=document.getElementById('scan-video');if(v){v.srcObject=null;v.onclick=null;}
-  const inp=document.getElementById('mbi');if(inp)inp.remove();
+  const v=document.getElementById('scan-video');if(v)v.srcObject=null;
+  document.getElementById('scan-file-input').value='';
   document.getElementById('scan-ov').classList.remove('open');
 }
 

@@ -662,6 +662,8 @@ select option{background:var(--s3)}
     <div class="scan-lbl" id="scan-lbl">Apunta al código de barras</div>
   </div>
   <button class="scan-close" onclick="closeScanner()">✕</button>
+  <button id="torch-btn" onclick="toggleTorch()" style="display:none;position:absolute;top:16px;left:16px;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.6);border:1px solid var(--bd2);color:var(--t1);font-size:18px;cursor:pointer;align-items:center;justify-content:center;pointer-events:all">🔦</button>
+  <div style="position:absolute;top:16px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.5);color:rgba(255,255,255,.5);font-size:10px;padding:4px 10px;border-radius:10px;white-space:nowrap;pointer-events:none">Toca la pantalla para enfocar</div>
   <div style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:all;width:280px">
     <div style="font-size:11px;color:rgba(255,255,255,.5)">¿No lee el código? Ingrésalo manualmente:</div>
     <div style="display:flex;gap:6px;width:100%">
@@ -1285,21 +1287,98 @@ function scanForField(fid){scanFieldMode=true;scanFieldTarget=fid;startScanner()
 function startScanner(){
   document.getElementById('scan-ov').classList.add('open');
   if(!navigator.mediaDevices){alert('Usa Chrome en el celular para escanear');closeScanner();return;}
-  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+
+  // Constraints mejorados: resolución alta + foco continuo
+  const constraints={
+    video:{
+      facingMode:{ideal:'environment'},
+      width:{ideal:1920,min:640},
+      height:{ideal:1080,min:480},
+      focusMode:'continuous',
+      advanced:[{focusMode:'continuous'},{torch:false}]
+    }
+  };
+
+  navigator.mediaDevices.getUserMedia(constraints)
+  .catch(()=>navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}))
   .then(stream=>{
     scannerStream=stream;scannerActive=true;
-    const v=document.getElementById('scan-video');v.srcObject=stream;v.play();
+    const v=document.getElementById('scan-video');
+    v.srcObject=stream;v.play();
+
+    // Forzar foco continuo en la pista de video
+    const track=stream.getVideoTracks()[0];
+    if(track&&track.applyConstraints){
+      track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+    }
+
+    // Botón de linterna
+    const hasFlash=track&&track.getCapabilities&&track.getCapabilities().torch;
+    const torchBtn=document.getElementById('torch-btn');
+    if(torchBtn) torchBtn.style.display=hasFlash?'flex':'none';
+
+    // Tocar pantalla = reenfocar
+    v.addEventListener('click',()=>{
+      if(track&&track.applyConstraints){
+        track.applyConstraints({advanced:[{focusMode:'single-shot'}]})
+          .then(()=>track.applyConstraints({advanced:[{focusMode:'continuous'}]}))
+          .catch(()=>{});
+      }
+    });
+
     if(window.Quagga){
-      Quagga.init({inputStream:{name:'Live',type:'LiveStream',target:v,constraints:{facingMode:'environment'}},decoder:{readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader']},locate:true},err=>{
-        if(err){fallbackScanner();return;}
+      Quagga.init({
+        inputStream:{
+          name:'Live',type:'LiveStream',target:v,
+          constraints:{facingMode:'environment',width:1280,height:720},
+          area:{top:'15%',right:'5%',left:'5%',bottom:'15%'}
+        },
+        decoder:{
+          readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader','code_39_reader'],
+          multiple:false
+        },
+        locate:true,
+        frequency:15,
+        locator:{patchSize:'medium',halfSample:false}
+      },err=>{
+        if(err){console.warn('Quagga err',err);fallbackScanner();return;}
         Quagga.start();
-        Quagga.onDetected(data=>{if(!scannerActive)return;handleBarcode(data.codeResult.code);});
+        let lastCode='';let lastTime=0;
+        Quagga.onDetected(data=>{
+          if(!scannerActive)return;
+          const code=data.codeResult.code;
+          const confidence=data.codeResult.decodedCodes
+            .filter(c=>c.error!==undefined)
+            .reduce((s,c,_,a)=>s+c.error/a.length,0);
+          const now=Date.now();
+          // Evitar lecturas duplicadas y filtrar baja confianza
+          if(confidence>0.25)return;
+          if(code===lastCode&&now-lastTime<2000)return;
+          lastCode=code;lastTime=now;
+          // Vibración si está disponible
+          if(navigator.vibrate)navigator.vibrate(100);
+          handleBarcode(code);
+        });
       });
     }else{fallbackScanner();}
-  }).catch(()=>{alert('No se pudo acceder a la cámara');closeScanner();});
+  }).catch(()=>{alert('No se pudo acceder a la cámara. Verifica los permisos en Chrome.');closeScanner();});
 }
+
+function toggleTorch(){
+  if(!scannerStream)return;
+  const track=scannerStream.getVideoTracks()[0];if(!track)return;
+  const btn=document.getElementById('torch-btn');
+  const currentTorch=track.getSettings().torch||false;
+  track.applyConstraints({advanced:[{torch:!currentTorch}]})
+    .then(()=>{
+      btn.style.background=!currentTorch?'var(--amb)':'rgba(0,0,0,.6)';
+      btn.style.color=!currentTorch?'#000':'var(--t1)';
+    }).catch(()=>showToast('Linterna no disponible en este dispositivo'));
+}
+
 function fallbackScanner(){
-  const inp=document.createElement('input');inp.style.cssText='position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 14px;font-size:16px;text-align:center;z-index:10;width:200px;pointer-events:all';
+  const inp=document.createElement('input');
+  inp.style.cssText='position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 14px;font-size:16px;text-align:center;z-index:10;width:200px;pointer-events:all';
   inp.placeholder='Código manual';inp.id='mbi';
   document.getElementById('scan-ov').appendChild(inp);inp.focus();
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim())handleBarcode(inp.value.trim());});

@@ -656,44 +656,22 @@ select option{background:var(--s3)}
 
 <!-- SCANNER -->
 <div class="scan-ov" id="scan-ov">
-  <div style="position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px">
-
-    <div style="font-size:32px">📷</div>
-    <div style="font-size:16px;font-weight:700;color:var(--t1);text-align:center">Escanear código</div>
-
-    <!-- Opción 1: Google Lens -->
-    <a id="lens-btn" href="googlelens://" onclick="abrirLens(event)" style="background:#4285F4;border:none;border-radius:14px;color:#fff;font-weight:700;font-size:14px;padding:14px 24px;cursor:pointer;display:flex;align-items:center;gap:10px;width:260px;justify-content:center;text-decoration:none">
-      <img src="https://www.gstatic.com/images/branding/googleg/1x/googleg_standard_color_128dp.png" style="width:20px;height:20px;border-radius:50%">
-      Abrir Google Lens
-    </a>
-    <div style="font-size:11px;color:var(--t3);text-align:center;max-width:240px">Escanea el código en Lens, copia el número y pégalo abajo</div>
-
-    <!-- Opción 2: Cámara nativa -->
-    <button onclick="document.getElementById('scan-file-input').click()" style="background:var(--s3);border:1px solid var(--bd2);border-radius:14px;color:var(--t1);font-weight:600;font-size:13px;padding:12px 24px;cursor:pointer;display:flex;align-items:center;gap:8px;width:260px;justify-content:center">
-      📸 Abrir cámara y tomar foto
-    </button>
-    <input type="file" id="scan-file-input" accept="image/*" capture="environment" style="display:none" onchange="processScanImage(this)">
-
-    <div style="width:260px;display:flex;align-items:center;gap:10px">
-      <div style="flex:1;height:1px;background:var(--bd)"></div>
-      <span style="font-size:11px;color:var(--t3)">o escribe el código</span>
-      <div style="flex:1;height:1px;background:var(--bd)"></div>
-    </div>
-
-    <!-- Campo manual — grande y fácil de usar -->
-    <div style="width:260px;display:flex;flex-direction:column;gap:8px">
-      <input id="manual-bc-input" placeholder="Pega o escribe el código..." inputmode="numeric"
-        style="width:100%;background:var(--s2);border:2px solid var(--grn);border-radius:10px;color:var(--t1);padding:12px 14px;font-size:16px;outline:none;font-family:var(--mono);text-align:center;letter-spacing:2px"
-        onkeydown="if(event.key==='Enter'&&this.value.trim())submitManualBarcode()">
-      <button onclick="submitManualBarcode()" style="width:100%;background:var(--grn);border:none;border-radius:10px;color:#001a0f;font-weight:700;font-size:15px;padding:13px;cursor:pointer">
-        ✓ Confirmar código
-      </button>
-    </div>
-
-    <div id="scan-status" style="font-size:12px;color:var(--grn);min-height:16px;text-align:center"></div>
+  <video id="scan-video" autoplay playsinline muted style="width:100%;flex:1;object-fit:cover;display:block"></video>
+  <div class="scan-ui">
+    <div class="scan-frame"><div class="scan-line"></div></div>
+    <div class="scan-lbl" id="scan-lbl">Apunta al código de barras</div>
   </div>
-
-  <button class="scan-close" onclick="closeScanner()" style="position:absolute;top:16px;right:16px">✕</button>
+  <button class="scan-close" onclick="closeScanner()">✕</button>
+  <div style="position:absolute;bottom:24px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:all;width:290px">
+    <div style="font-size:11px;color:rgba(255,255,255,.4)">¿No lee? Ingrésalo manualmente:</div>
+    <div style="display:flex;gap:6px;width:100%">
+      <input id="manual-bc-input" placeholder="Escribe el código aquí..." inputmode="numeric"
+        style="flex:1;background:rgba(0,0,0,.8);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 12px;font-size:15px;outline:none;font-family:var(--mono)"
+        onkeydown="if(event.key==='Enter'&&this.value.trim())submitManualBarcode()">
+      <button onclick="submitManualBarcode()" style="background:var(--grn);border:none;border-radius:8px;color:#001a0f;font-weight:700;font-size:13px;padding:10px 14px;cursor:pointer">OK</button>
+    </div>
+    <div id="scan-status" style="font-size:11px;color:var(--grn);min-height:16px"></div>
+  </div>
 </div>
 
 <!-- MODALS -->
@@ -1310,63 +1288,37 @@ function scanForField(fid){scanFieldMode=true;scanFieldTarget=fid;startScanner()
 
 function startScanner(){
   document.getElementById('scan-ov').classList.add('open');
+  document.getElementById('scan-lbl').textContent='Apunta al código de barras';
   document.getElementById('manual-bc-input').value='';
-  document.getElementById('scan-status').textContent='';
-  // Enfocar campo manual cuando vuelva de Lens
-  setTimeout(()=>document.getElementById('manual-bc-input').focus(),400);
-}
-
-function abrirLens(e){
-  // Intentar abrir Google Lens — si no está instalado, fallback a cámara
-  const url='googlelens://';
-  const fallback=()=>document.getElementById('scan-file-input').click();
-  // Detectar si abrió Lens
-  const t=Date.now();
-  setTimeout(()=>{if(Date.now()-t<2000)fallback();},1500);
-}
-
-// Cuando vuelve de Lens — reenfocar campo para pegar
-document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&document.getElementById('scan-ov').classList.contains('open')){
-    setTimeout(()=>{
-      const inp=document.getElementById('manual-bc-input');
-      if(inp){inp.focus();inp.select();}
-    },300);
-  }
-});
-
-async function processScanImage(input){
-  if(!input||!input.files||!input.files[0])return;
-  const status=document.getElementById('scan-status');
-  status.style.color='var(--grn)';
-  status.textContent='🔍 Leyendo imagen...';
-  // Usar Quagga para leer desde imagen
-  if(window.Quagga){
-    const url=URL.createObjectURL(input.files[0]);
-    Quagga.decodeSingle({
-      src:url,
-      numOfWorkers:0,
-      decoder:{readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader']},
-      locate:true
-    },result=>{
-      URL.revokeObjectURL(url);
-      input.value='';
-      if(result&&result.codeResult){
-        status.textContent='✓ Código encontrado';
-        if(navigator.vibrate)navigator.vibrate(100);
-        setTimeout(()=>handleBarcode(result.codeResult.code),300);
-      }else{
-        status.style.color='var(--amb)';
-        status.textContent='No detectado — escríbelo manualmente ↓';
-        document.getElementById('manual-bc-input').focus();
-      }
-    });
-  } else {
-    input.value='';
-    status.style.color='var(--amb)';
-    status.textContent='Escríbelo manualmente ↓';
-    document.getElementById('manual-bc-input').focus();
-  }
+  if(!navigator.mediaDevices){closeScanner();return;}
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+  .then(stream=>{
+    scannerStream=stream;scannerActive=true;
+    const v=document.getElementById('scan-video');v.srcObject=stream;v.play();
+    if(window.Quagga){
+      Quagga.init({
+        inputStream:{name:'Live',type:'LiveStream',target:v,constraints:{facingMode:'environment'}},
+        decoder:{readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader']},
+        locate:true
+      },err=>{
+        if(err){document.getElementById('scan-lbl').textContent='Escáner no disponible — usa el campo manual';return;}
+        Quagga.start();
+        let lastCode='';let lastTime=0;
+        Quagga.onDetected(data=>{
+          if(!scannerActive)return;
+          const code=data.codeResult.code;
+          const now=Date.now();
+          if(code===lastCode&&now-lastTime<3000)return;
+          lastCode=code;lastTime=now;
+          scannerActive=false;
+          if(navigator.vibrate)navigator.vibrate(100);
+          handleBarcode(code);
+        });
+      });
+    }
+  }).catch(()=>{
+    document.getElementById('scan-lbl').textContent='Sin acceso a cámara — usa el campo manual';
+  });
 }
 
 function submitManualBarcode(){
@@ -1397,7 +1349,7 @@ function closeScanner(){
   scannerActive=false;
   if(window.Quagga){try{Quagga.stop();}catch(e){}}
   if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
-  document.getElementById('scan-file-input').value='';
+  const v=document.getElementById('scan-video');if(v)v.srcObject=null;
   document.getElementById('scan-ov').classList.remove('open');
 }
 

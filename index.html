@@ -6,7 +6,7 @@
 <title>Mini Mercado Claro Azul</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.2/dist/quagga.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -1284,84 +1284,73 @@ function exportReporte(){
 // ── SCANNER ────────────────────────────────────────────────────────────────
 function openScanner(){scanFieldMode=false;startScanner();}
 function scanForField(fid){scanFieldMode=true;scanFieldTarget=fid;startScanner();}
+let zxingReader=null;
+
 function startScanner(){
   document.getElementById('scan-ov').classList.add('open');
   if(!navigator.mediaDevices){alert('Usa Chrome en el celular para escanear');closeScanner();return;}
 
-  // Constraints mejorados: resolución alta + foco continuo
-  const constraints={
-    video:{
-      facingMode:{ideal:'environment'},
-      width:{ideal:1920,min:640},
-      height:{ideal:1080,min:480},
-      focusMode:'continuous',
-      advanced:[{focusMode:'continuous'},{torch:false}]
-    }
-  };
+  const v=document.getElementById('scan-video');
+  document.getElementById('scan-lbl').textContent='Apunta al código de barras';
 
-  navigator.mediaDevices.getUserMedia(constraints)
-  .catch(()=>navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}))
-  .then(stream=>{
-    scannerStream=stream;scannerActive=true;
-    const v=document.getElementById('scan-video');
-    v.srcObject=stream;v.play();
+  // ZXing — mejor soporte en celulares
+  if(window.ZXing){
+    try{
+      const hints=new Map();
+      const formats=[
+        ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.CODE_128, ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.UPC_A, ZXing.BarcodeFormat.UPC_E,
+        ZXing.BarcodeFormat.QR_CODE
+      ];
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+      hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
 
-    // Forzar foco continuo en la pista de video
-    const track=stream.getVideoTracks()[0];
-    if(track&&track.applyConstraints){
-      track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
-    }
-
-    // Botón de linterna
-    const hasFlash=track&&track.getCapabilities&&track.getCapabilities().torch;
-    const torchBtn=document.getElementById('torch-btn');
-    if(torchBtn) torchBtn.style.display=hasFlash?'flex':'none';
-
-    // Tocar pantalla = reenfocar
-    v.addEventListener('click',()=>{
-      if(track&&track.applyConstraints){
-        track.applyConstraints({advanced:[{focusMode:'single-shot'}]})
-          .then(()=>track.applyConstraints({advanced:[{focusMode:'continuous'}]}))
-          .catch(()=>{});
-      }
-    });
-
-    if(window.Quagga){
-      Quagga.init({
-        inputStream:{
-          name:'Live',type:'LiveStream',target:v,
-          constraints:{facingMode:'environment',width:1280,height:720},
-          area:{top:'15%',right:'5%',left:'5%',bottom:'15%'}
-        },
-        decoder:{
-          readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader','code_39_reader'],
-          multiple:false
-        },
-        locate:true,
-        frequency:15,
-        locator:{patchSize:'medium',halfSample:false}
-      },err=>{
-        if(err){console.warn('Quagga err',err);fallbackScanner();return;}
-        Quagga.start();
-        let lastCode='';let lastTime=0;
-        Quagga.onDetected(data=>{
-          if(!scannerActive)return;
-          const code=data.codeResult.code;
-          const confidence=data.codeResult.decodedCodes
-            .filter(c=>c.error!==undefined)
-            .reduce((s,c,_,a)=>s+c.error/a.length,0);
-          const now=Date.now();
-          // Evitar lecturas duplicadas y filtrar baja confianza
-          if(confidence>0.25)return;
-          if(code===lastCode&&now-lastTime<2000)return;
-          lastCode=code;lastTime=now;
-          // Vibración si está disponible
-          if(navigator.vibrate)navigator.vibrate(100);
-          handleBarcode(code);
-        });
+      zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+      zxingReader.decodeFromConstraints(
+        {video:{facingMode:'environment',width:{ideal:1280},height:{ideal:720}}},
+        v,
+        (result, err)=>{
+          if(!scannerActive) return;
+          if(result){
+            if(navigator.vibrate) navigator.vibrate(100);
+            handleBarcode(result.getText());
+          }
+        }
+      ).then(controls=>{
+        scannerActive=true;
+        // Foco continuo
+        if(v.srcObject){
+          const track=v.srcObject.getVideoTracks()[0];
+          scannerStream=v.srcObject;
+          if(track){
+            track.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(()=>{});
+            const caps=track.getCapabilities&&track.getCapabilities();
+            const torchBtn=document.getElementById('torch-btn');
+            if(torchBtn) torchBtn.style.display=(caps&&caps.torch)?'flex':'none';
+          }
+        }
+        // Tap para enfocar
+        v.onclick=()=>{
+          if(v.srcObject){
+            const t=v.srcObject.getVideoTracks()[0];
+            if(t) t.applyConstraints({advanced:[{focusMode:'single-shot'}]})
+              .then(()=>t.applyConstraints({advanced:[{focusMode:'continuous'}]}))
+              .catch(()=>{});
+          }
+        };
+      }).catch(err=>{
+        console.warn('ZXing error:',err);
+        fallbackScanner();
       });
-    }else{fallbackScanner();}
-  }).catch(()=>{alert('No se pudo acceder a la cámara. Verifica los permisos en Chrome.');closeScanner();});
+    }catch(e){
+      console.warn('ZXing init error:',e);
+      fallbackScanner();
+    }
+  } else {
+    // Fallback sin librería
+    fallbackScanner();
+  }
 }
 
 function toggleTorch(){
@@ -1377,10 +1366,12 @@ function toggleTorch(){
 }
 
 function fallbackScanner(){
+  document.getElementById('scan-lbl').textContent='Escáner no disponible — ingresa el código';
   const inp=document.createElement('input');
-  inp.style.cssText='position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 14px;font-size:16px;text-align:center;z-index:10;width:200px;pointer-events:all';
-  inp.placeholder='Código manual';inp.id='mbi';
-  document.getElementById('scan-ov').appendChild(inp);inp.focus();
+  inp.style.cssText='position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.85);border:2px solid var(--grn);border-radius:8px;color:#fff;padding:10px 14px;font-size:16px;text-align:center;z-index:10;width:220px;pointer-events:all;outline:none';
+  inp.placeholder='Escribe el código aquí';inp.id='mbi';
+  document.getElementById('scan-ov').appendChild(inp);
+  setTimeout(()=>inp.focus(),200);
   inp.addEventListener('keydown',e=>{if(e.key==='Enter'&&inp.value.trim())handleBarcode(inp.value.trim());});
 }
 function handleBarcode(code){
@@ -1399,8 +1390,9 @@ function handleBarcode(code){
 }
 function closeScanner(){
   scannerActive=false;
-  if(window.Quagga){try{Quagga.stop();}catch(e){}}
+  if(zxingReader){try{zxingReader.reset();}catch(e){}zxingReader=null;}
   if(scannerStream){scannerStream.getTracks().forEach(t=>t.stop());scannerStream=null;}
+  const v=document.getElementById('scan-video');if(v){v.srcObject=null;v.onclick=null;}
   const inp=document.getElementById('mbi');if(inp)inp.remove();
   document.getElementById('scan-ov').classList.remove('open');
 }

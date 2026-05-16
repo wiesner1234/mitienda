@@ -568,9 +568,32 @@ select option{background:var(--s3)}
 
 <!-- CIERRES -->
 <div id="page-cierres" class="page">
-  <div class="ph"><div class="ph-left"><h1>Cierre de caja</h1></div><div class="ph-right"><button class="btn btn-grn btn-sm" onclick="hacerCierre()">🔐 Cerrar caja hoy</button></div></div>
-  <div class="card" id="cierre-hoy-card" style="display:none"><div class="card-hd"><span class="card-hd-t" id="cierre-hoy-titulo">Hoy</span></div><div class="card-bd" id="cierre-hoy-body"></div></div>
-  <div class="card"><div class="card-hd"><span class="card-hd-t">Historial</span></div><div id="t-cierres"><div class="empty">Sin cierres</div></div></div>
+  <div class="ph">
+    <div class="ph-left"><h1>Cierre de caja</h1><p>Los cierres se guardan en la nube — nunca se saturan</p></div>
+    <div class="ph-right">
+      <select id="cierre-fil-mes" onchange="renderCierres()" style="width:110px">
+        <option value="">Todos los meses</option>
+        <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+        <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+        <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+        <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+      </select>
+      <select id="cierre-fil-anio" onchange="renderCierres()" style="width:85px">
+        <option value="">Todos</option>
+        <option value="2025">2025</option><option value="2026" selected>2026</option>
+      </select>
+      <button class="btn btn-blu btn-sm" onclick="exportCierreSeleccionado()">⬇ Excel detallado</button>
+      <button class="btn btn-grn btn-sm" onclick="hacerCierre()">🔐 Cerrar caja hoy</button>
+    </div>
+  </div>
+  <div class="card" id="cierre-hoy-card" style="display:none">
+    <div class="card-hd"><span class="card-hd-t" id="cierre-hoy-titulo">Hoy</span><button class="btn btn-blu btn-xs" onclick="exportCierreHoy()">⬇ Excel de hoy</button></div>
+    <div class="card-bd" id="cierre-hoy-body"></div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><span class="card-hd-t">Historial de cierres</span><span id="cierre-count" style="font-size:11px;color:var(--t2)"></span></div>
+    <div id="t-cierres"><div class="empty">Sin cierres</div></div>
+  </div>
 </div>
 
 <!-- CONFIGURACIÓN -->
@@ -1019,15 +1042,21 @@ function renderCajaGrid(){
       <span class="pc-emoji">${catEmoji(p.categoria)}</span>
       <div class="pc-name">${p.nombre}</div>
       <div class="pc-price">${fmt(p.precio)}</div>
-      <div class="pc-stock">${p.stock===0?'⛔ Agotado':`Stock: ${p.stock}`}</div>
+      <div class="pc-stock">${p.stock===0?'⛔ Agotado':p.stock===1?'⚠️ Última unidad':`Stock: ${p.stock}`}</div>
+      ${p.stock===1?`<div style="font-size:9px;font-weight:600;color:var(--red);background:var(--red-bg);border-radius:4px;padding:2px 5px;margin-top:3px;text-align:center">ÚLTIMA UNIDAD</div>`:''}
+      ${p.stock>1&&p.stock<=p.stockMin?`<div style="font-size:9px;color:var(--amb);margin-top:2px">⚠️ Stock bajo</div>`:''}
       ${p.barcode?`<div style="font-size:9px;color:var(--t3);font-family:var(--mono);margin-top:3px">${p.barcode}</div>`:''}
     </div>`).join(''):
     '<div class="empty" style="grid-column:1/-1">No hay productos</div>';
 }
 function addToTicket(id){
+  const p=S.productos.find(x=>x.id===id);if(!p)return;
   const ex=ticketItems.find(i=>i.prodId===id);
+  const enTicket=ex?ex.qty:0;
+  if(p.stock-enTicket<=0){showToast('Sin stock disponible','err');return;}
   if(ex)ex.qty++;
-  else{const p=S.productos.find(x=>x.id===id);if(p)ticketItems.push({prodId:id,nombre:p.nombre,precio:p.precio,costo:p.costo,qty:1});}
+  else ticketItems.push({prodId:id,nombre:p.nombre,precio:p.precio,costo:p.costo,qty:1});
+  if(p.stock-enTicket===1)showToast(`⚠️ Última unidad de ${p.nombre}`,'warn');
   renderTicket();
 }
 function renderTicket(){
@@ -1444,25 +1473,128 @@ async function hacerCierre(){
   showToast('Cierre registrado ✓');renderCierres();
 }
 function renderCierres(){
+  const filMes=document.getElementById('cierre-fil-mes')?.value;
+  const filAnio=document.getElementById('cierre-fil-anio')?.value;
+  // Cierre de hoy
   const hoy=S.cierres.filter(c=>c.fecha===today()).sort((a,b)=>b.hora?.localeCompare(a.hora||''))[0];
   const card=document.getElementById('cierre-hoy-card');
   if(hoy){
     card.style.display='';
     document.getElementById('cierre-hoy-titulo').textContent=`Cierre de hoy — ${hoy.hora}`;
     const mHtml=hoy.metodos?Object.entries(hoy.metodos).map(([m,v])=>`<span style="font-size:11px;color:var(--t2)">${m}: <strong style="color:var(--t1)">${fmt(v)}</strong></span>`).join(' · '):'';
-    document.getElementById('cierre-hoy-body').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px">
-      <div class="sc"><div class="sc-lbl">Ventas</div><div class="sc-val c-grn mono">${fmt(hoy.totalVentas)}</div><div class="sc-sub">${hoy.ventas} transacciones</div></div>
-      <div class="sc"><div class="sc-lbl">Gastos</div><div class="sc-val c-red mono">${fmt(hoy.gastos)}</div></div>
-      <div class="sc"><div class="sc-lbl">Pagos</div><div class="sc-val c-red mono">${fmt(hoy.pagos||0)}</div></div>
-      <div class="sc"><div class="sc-lbl">Ganancia neta</div><div class="sc-val ${hoy.gananciaNeta>=0?'c-grn':'c-red'} mono">${fmt(hoy.gananciaNeta)}</div></div>
-    </div>${mHtml?`<div style="background:var(--s3);border-radius:var(--r);padding:7px 10px;margin-bottom:6px;font-size:11px">💳 ${mHtml}</div>`:''}
-    <p style="font-size:11px;color:var(--t2)">Cerrado por: ${hoy.cerradoPor}</p>`;
+    document.getElementById('cierre-hoy-body').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:10px">
+        <div class="sc"><div class="sc-lbl">Ventas</div><div class="sc-val c-grn mono">${fmt(hoy.totalVentas)}</div><div class="sc-sub">${hoy.ventas} transacciones</div></div>
+        <div class="sc"><div class="sc-lbl">Gastos</div><div class="sc-val c-red mono">${fmt(hoy.gastos)}</div></div>
+        <div class="sc"><div class="sc-lbl">Pagos</div><div class="sc-val c-red mono">${fmt(hoy.pagos||0)}</div></div>
+        <div class="sc"><div class="sc-lbl">Ganancia neta</div><div class="sc-val ${hoy.gananciaNeta>=0?'c-grn':'c-red'} mono">${fmt(hoy.gananciaNeta)}</div></div>
+      </div>
+      ${mHtml?`<div style="background:var(--s3);border-radius:var(--r);padding:7px 10px;margin-bottom:6px;font-size:11px">💳 ${mHtml}</div>`:''}
+      <p style="font-size:11px;color:var(--t2)">Cerrado por: ${hoy.cerradoPor}</p>`;
   }else{card.style.display='none';}
-  const sorted=[...S.cierres].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  document.getElementById('t-cierres').innerHTML=sorted.length?
-    `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Ventas</th><th>Gastos</th><th>Pagos</th><th>Ganancia</th><th>Por</th></tr></thead><tbody>`+
-    sorted.map(c=>`<tr><td>${c.fecha}</td><td>${c.hora||'—'}</td><td class="mono c-grn">${fmt(c.totalVentas)}</td><td class="mono c-red">${fmt(c.gastos)}</td><td class="mono c-red">${fmt(c.pagos||0)}</td><td class="mono ${c.gananciaNeta>=0?'c-grn':'c-red'}">${fmt(c.gananciaNeta)}</td><td>${c.cerradoPor||'—'}</td></tr>`).join('')+`</tbody></table>`:
-    '<div class="empty">Sin cierres</div>';
+
+  // Filtrar historial
+  let lista=[...S.cierres].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.hora?.localeCompare(a.hora||''));
+  if(filMes!=='')lista=lista.filter(c=>{const d=new Date(c.fecha+'T12:00:00');return d.getMonth()===parseInt(filMes);});
+  if(filAnio!=='')lista=lista.filter(c=>{const d=new Date(c.fecha+'T12:00:00');return d.getFullYear()===parseInt(filAnio);});
+
+  const cnt=document.getElementById('cierre-count');
+  if(cnt)cnt.textContent=`${lista.length} cierre${lista.length!==1?'s':''}`;
+
+  document.getElementById('t-cierres').innerHTML=lista.length?
+    `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Ventas</th><th>Métodos</th><th>Gastos</th><th>Pagos</th><th>Ganancia</th><th>Por</th><th></th></tr></thead><tbody>`+
+    lista.map(c=>`<tr>
+      <td>${c.fecha}</td><td style="color:var(--t3)">${c.hora||'—'}</td>
+      <td class="mono c-grn">${fmt(c.totalVentas)}</td>
+      <td style="font-size:10px;color:var(--t2)">${c.metodos?Object.entries(c.metodos).map(([m,v])=>`${m}: ${fmt(v)}`).join(' · '):'—'}</td>
+      <td class="mono c-red">${fmt(c.gastos)}</td>
+      <td class="mono c-red">${fmt(c.pagos||0)}</td>
+      <td class="mono ${c.gananciaNeta>=0?'c-grn':'c-red'}">${fmt(c.gananciaNeta)}</td>
+      <td>${c.cerradoPor||'—'}</td>
+      <td><button class="btn btn-blu btn-xs" onclick="exportCierre('${c.fecha}')">⬇</button></td>
+    </tr>`).join('')+`</tbody></table>`:
+    '<div class="empty">Sin cierres en este período</div>';
+}
+
+function exportCierreHoy(){exportCierre(today());}
+function exportCierreSeleccionado(){
+  // Exportar todos los cierres del filtro activo con detalle
+  const filMes=document.getElementById('cierre-fil-mes')?.value;
+  const filAnio=document.getElementById('cierre-fil-anio')?.value;
+  let fechas=S.cierres.map(c=>c.fecha);
+  if(filMes!=='')fechas=fechas.filter(f=>{const d=new Date(f+'T12:00:00');return d.getMonth()===parseInt(filMes);});
+  if(filAnio!=='')fechas=fechas.filter(f=>{const d=new Date(f+'T12:00:00');return d.getFullYear()===parseInt(filAnio);});
+  if(!fechas.length){showToast('No hay cierres en este período','warn');return;}
+  // Exportar rango completo
+  exportRangoCierres([...new Set(fechas)]);
+}
+
+function exportCierre(fecha){exportRangoCierres([fecha]);}
+
+function exportRangoCierres(fechas){
+  if(!window.XLSX)return;
+  const wb=XLSX.utils.book_new();
+
+  // Hoja 1: Resumen de cierres
+  const cierresFecha=fechas.map(f=>S.cierres.filter(c=>c.fecha===f).sort((a,b)=>b.hora?.localeCompare(a.hora||''))[0]).filter(Boolean);
+  const resumenRows=cierresFecha.map(c=>({
+    Fecha:c.fecha, Hora:c.hora||'', 'Ventas totales':c.totalVentas, 'N° ventas':c.ventas,
+    Efectivo:c.metodos?.Efectivo||0, Nequi:c.metodos?.Nequi||0,
+    Daviplata:c.metodos?.Daviplata||0, Breve:c.metodos?.Breve||0,
+    Gastos:c.gastos, Pagos:c.pagos||0, 'Ganancia neta':c.gananciaNeta,
+    'Cerrado por':c.cerradoPor||''
+  }));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(resumenRows),'Resumen cierres');
+
+  // Hoja 2: Ventas detalladas
+  const ventas=S.ventas.filter(v=>fechas.includes(v.fecha));
+  const ventasRows=[];
+  ventas.forEach(v=>{
+    if(v.items&&v.items.length){
+      v.items.forEach(i=>{
+        ventasRows.push({Fecha:v.fecha,Hora:v.hora||'','Vendido por':v.vendidoPor||'',Método:v.metodoPago||'',Producto:i.nombre,Cantidad:i.qty,'Precio unitario':i.precio,'Costo unitario':i.costo,'Subtotal venta':i.precio*i.qty,'Subtotal costo':i.costo*i.qty,'Ganancia item':(i.precio-i.costo)*i.qty,'ID Venta':v.id,Notas:v.notas||''});
+      });
+    }else{
+      ventasRows.push({Fecha:v.fecha,Hora:v.hora||'','Vendido por':v.vendidoPor||'',Método:v.metodoPago||'',Producto:'—',Cantidad:1,'Precio unitario':v.total,'Costo unitario':v.costoTotal,'Subtotal venta':v.total,'Subtotal costo':v.costoTotal,'Ganancia item':v.total-v.costoTotal,'ID Venta':v.id,Notas:v.notas||''});
+    }
+  });
+  if(ventasRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ventasRows),'Ventas detalladas');
+
+  // Hoja 3: Pagos a proveedores y otros
+  const pagos=S.pagos.filter(p=>fechas.includes(p.fecha));
+  const pagosRows=pagos.map(p=>({Fecha:p.fecha,Descripción:p.descripcion,Categoría:p.categoria,Proveedor:p.proveedor||'—',Concepto:p.notas||p.descripcion,'Método de pago':p.metodo||'',Monto:p.monto,'Registrado por':p.registradoPor||''}));
+  if(pagosRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(pagosRows),'Pagos');
+
+  // Hoja 4: Gastos
+  const gastos=S.gastos.filter(g=>fechas.includes(g.fecha));
+  const gastosRows=gastos.map(g=>({Fecha:g.fecha,Descripción:g.descripcion,Categoría:g.categoria,Monto:g.monto,'Registrado por':g.registradoPor||''}));
+  if(gastosRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(gastosRows),'Gastos');
+
+  // Hoja 5: Resumen financiero
+  const tv=ventas.reduce((s,v)=>s+v.total,0);
+  const tc=ventas.reduce((s,v)=>s+v.costoTotal,0);
+  const tg=gastos.reduce((s,g)=>s+g.monto,0);
+  const tp=pagos.reduce((s,p)=>s+p.monto,0);
+  const finRows=[
+    {Concepto:'Ventas brutas',Valor:tv},
+    {Concepto:'Costo de ventas',Valor:tc},
+    {Concepto:'Utilidad bruta',Valor:tv-tc},
+    {Concepto:'Gastos operativos',Valor:tg},
+    {Concepto:'Pagos (proveedores, servicios, etc)',Valor:tp},
+    {Concepto:'Ganancia neta',Valor:tv-tc-tg-tp},
+    {Concepto:'Margen neto %',Valor:tv>0?((tv-tc-tg-tp)/tv*100).toFixed(1)+'%':'0%'},
+  ];
+  // Desglose por proveedor
+  const porProv={};pagos.filter(p=>p.categoria==='Proveedor'&&p.proveedor).forEach(p=>{porProv[p.proveedor]=(porProv[p.proveedor]||0)+p.monto;});
+  if(Object.keys(porProv).length){
+    finRows.push({Concepto:'','Valor':''},{Concepto:'PAGOS POR PROVEEDOR','Valor':''});
+    Object.entries(porProv).forEach(([prov,monto])=>finRows.push({Concepto:prov,Valor:monto}));
+  }
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(finRows),'Resumen financiero');
+
+  const nombreArchivo=fechas.length===1?`cierre_${fechas[0]}.xlsx`:`cierres_${fechas[0]}_a_${fechas[fechas.length-1]}.xlsx`;
+  XLSX.writeFile(wb,nombreArchivo);
+  showToast('Excel descargado ✓');
 }
 
 // ── CONFIG ─────────────────────────────────────────────────────────────────

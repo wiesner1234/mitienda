@@ -3,9 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0d12">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>Mini Mercado Claro Azul</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js').catch(()=>{});}</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -271,6 +274,42 @@ select option{background:var(--s3)}
 .sft.active{background:var(--grn-bg);border-color:var(--grn-bd);color:var(--grn)}
 .sft.red.active{background:var(--red-bg);border-color:var(--red-bd);color:var(--red)}
 .sft.amber.active{background:var(--amb-bg);border-color:var(--amb-bd);color:var(--amb)}
+
+/* Gráfica de barras vertical */
+.chart-v{display:flex;align-items:flex-end;gap:4px;height:160px;padding:0 4px}
+.chart-v-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.chart-v-bar{width:100%;border-radius:4px 4px 0 0;transition:height .4s ease;min-height:2px;position:relative}
+.chart-v-bar:hover{opacity:.8}
+.chart-v-label{font-size:9px;color:var(--t3);text-align:center;white-space:nowrap}
+.chart-v-val{font-size:9px;color:var(--t2);font-family:var(--mono)}
+
+/* Presupuesto */
+.pres-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--bd)}
+.pres-row:last-child{border-bottom:none}
+.pres-label{width:140px;font-size:12px;font-weight:500;flex-shrink:0}
+.pres-bars{flex:1;display:flex;flex-direction:column;gap:3px}
+.pres-bar-bg{height:8px;background:var(--s3);border-radius:4px;overflow:hidden;position:relative}
+.pres-bar-fill{height:100%;border-radius:4px;transition:width .5s}
+.pres-nums{display:flex;justify-content:space-between;font-size:10px;color:var(--t2);font-family:var(--mono)}
+
+/* Conteo físico */
+.conteo-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--s2);border-radius:var(--r);border:1px solid var(--bd);margin-bottom:6px}
+.conteo-nombre{flex:1;font-size:12px;font-weight:500}
+.conteo-sistema{font-size:11px;color:var(--t2);font-family:var(--mono);min-width:60px;text-align:center}
+.conteo-input{width:70px;text-align:center;font-family:var(--mono);font-size:13px}
+.conteo-diff{font-size:12px;font-weight:700;font-family:var(--mono);min-width:50px;text-align:right}
+
+/* Cuadre de caja */
+.cuadre-denom{display:grid;grid-template-columns:1fr 80px 80px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)}
+.cuadre-denom:last-child{border-bottom:none}
+
+/* Orden de compra */
+.orden-item{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--s2);border-radius:var(--r);border:1px solid var(--bd);margin-bottom:5px}
+.orden-nombre{flex:1;font-size:12px;font-weight:500}
+.orden-stock{font-size:10px;color:var(--t2)}
+
+/* Oferta badge */
+.oferta-badge{background:#1a0a2e;border:1px solid #6a0dad;color:#c77dff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -342,11 +381,17 @@ select option{background:var(--s3)}
   <button class="nav-btn admin-only" onclick="goTo('fiados')"><span class="nav-icon">🤝</span>Fiados<span class="nav-badge" id="nb-fiados" style="display:none">0</span></button>
   <button class="nav-btn admin-only" onclick="goTo('egresos')"><span class="nav-icon">💸</span>Egresos</button>
   <button class="nav-btn admin-only" onclick="goTo('inventario')"><span class="nav-icon">🗃️</span>Inventario<span class="nav-badge" id="nb-inv" style="display:none">0</span></button>
+  <button class="nav-btn admin-only" onclick="goTo('conteo')"><span class="nav-icon">🔢</span>Conteo físico</button>
+  <button class="nav-btn admin-only" onclick="goTo('ordenes')"><span class="nav-icon">📋</span>Órdenes compra</button>
+  <button class="nav-btn admin-only" onclick="goTo('ofertas')"><span class="nav-icon">🏷️</span>Ofertas</button>
   <div class="nav-sep admin-only"></div>
   <div class="nav-section admin-only">Análisis</div>
   <button class="nav-btn admin-only" onclick="goTo('reportes')"><span class="nav-icon">📈</span>Reportes</button>
+  <button class="nav-btn admin-only" onclick="goTo('tendencias')"><span class="nav-icon">📉</span>Tendencias</button>
+  <button class="nav-btn admin-only" onclick="goTo('presupuesto')"><span class="nav-icon">🎯</span>Presupuesto</button>
   <button class="nav-btn admin-only" onclick="goTo('libro')"><span class="nav-icon">📒</span>Libro contable</button>
   <button class="nav-btn admin-only" onclick="goTo('cierres')"><span class="nav-icon">🔐</span>Cierre caja</button>
+  <button class="nav-btn admin-only" onclick="goTo('cuadre')"><span class="nav-icon">💵</span>Cuadre caja</button>
   <div class="sidebar-bottom">
     <div class="nav-sep"></div>
     <button class="nav-btn admin-only" onclick="goTo('configuracion')"><span class="nav-icon">⚙️</span>Configuración</button>
@@ -620,6 +665,203 @@ select option{background:var(--s3)}
   </div>
 </div>
 
+<!-- CONTEO FÍSICO -->
+<div id="page-conteo" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>🔢 Conteo físico</h1><p>Compara stock del sistema vs lo que hay realmente</p></div>
+    <div class="ph-right">
+      <button class="btn btn-sec btn-sm" onclick="iniciarConteo()">↺ Actualizar lista</button>
+      <button class="btn btn-grn btn-sm" onclick="aplicarConteo()">✓ Aplicar ajustes</button>
+      <button class="btn btn-blu btn-sm" onclick="exportConteo()">⬇ Excel</button>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-bd" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div style="font-size:12px;color:var(--t2)">Filtra por categoría:</div>
+      <div id="conteo-cats" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+    </div>
+  </div>
+  <div class="two-col">
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-hd-t">Productos — ingresa cantidad física</span><span id="conteo-diff-count" style="font-size:11px;color:var(--t2)"></span></div>
+        <div class="card-bd" id="conteo-lista"><div class="empty">Toca "Actualizar lista" para comenzar</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-hd-t">Diferencias encontradas</span></div>
+        <div class="card-bd" id="conteo-diffs"><div class="empty">Sin diferencias aún</div></div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><span class="card-hd-t">Resumen del conteo</span></div>
+        <div class="card-bd" id="conteo-resumen"><div class="empty">Sin datos</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ÓRDENES DE COMPRA -->
+<div id="page-ordenes" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>📋 Órdenes de compra</h1><p>Pedidos sugeridos a proveedores según stock bajo</p></div>
+    <div class="ph-right">
+      <button class="btn btn-sec btn-sm" onclick="generarOrden()">⚡ Generar orden automática</button>
+      <button class="btn btn-grn btn-sm" onclick="openModal('m-orden')">+ Orden manual</button>
+    </div>
+  </div>
+  <!-- Orden automática sugerida -->
+  <div class="card" id="orden-sugerida" style="display:none">
+    <div class="card-hd"><span class="card-hd-t">⚡ Orden sugerida — productos bajo stock mínimo</span><button class="btn btn-blu btn-xs" onclick="exportOrden()">⬇ Excel</button></div>
+    <div class="card-bd" id="orden-sugerida-body"></div>
+    <div style="padding:10px 16px;border-top:1px solid var(--bd);display:flex;gap:8px">
+      <button class="btn btn-grn btn-sm" onclick="confirmarOrden()">✓ Registrar como orden</button>
+      <button class="btn btn-sec btn-sm" onclick="document.getElementById('orden-sugerida').style.display='none'">Cancelar</button>
+    </div>
+  </div>
+  <!-- Historial de órdenes -->
+  <div class="card">
+    <div class="card-hd"><span class="card-hd-t">Historial de órdenes</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Proveedor</th><th>Productos</th><th>Total estimado</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="t-ordenes"><tr><td colspan="6" class="empty">Sin órdenes registradas</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- OFERTAS DE PROVEEDORES -->
+<div id="page-ofertas" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>🏷️ Ofertas de proveedores</h1><p>Registra ofertas especiales para aprovechar márgenes</p></div>
+    <div class="ph-right"><button class="btn btn-grn btn-sm" onclick="openModal('m-oferta')">+ Registrar oferta</button></div>
+  </div>
+  <div id="ofertas-activas" style="margin-bottom:14px"></div>
+  <div class="card">
+    <div class="card-hd"><span class="card-hd-t">Historial de ofertas</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Producto</th><th>Proveedor</th><th>Precio normal</th><th>Precio oferta</th><th>Ahorro %</th><th>Vigente hasta</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="t-ofertas"><tr><td colspan="8" class="empty">Sin ofertas registradas</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- TENDENCIAS -->
+<div id="page-tendencias" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>📉 Tendencias</h1><p>Comportamiento de ventas en el tiempo</p></div>
+    <div class="ph-right">
+      <select id="tend-anio" onchange="renderTendencias()" style="width:85px"></select>
+    </div>
+  </div>
+  <!-- Ventas por mes -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-hd"><span class="card-hd-t">Ventas mensuales del año</span></div>
+    <div class="card-bd">
+      <div class="chart-v" id="chart-mensual"></div>
+    </div>
+  </div>
+  <!-- Horas pico -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">🕐 Horas pico de ventas</span></div>
+      <div class="card-bd">
+        <div class="chart-v" id="chart-horas" style="height:120px"></div>
+        <div style="font-size:11px;color:var(--t2);margin-top:8px" id="hora-pico-lbl"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">📅 Ventas por día de la semana</span></div>
+      <div class="card-bd">
+        <div class="chart-v" id="chart-dias" style="height:120px"></div>
+        <div style="font-size:11px;color:var(--t2);margin-top:8px" id="dia-pico-lbl"></div>
+      </div>
+    </div>
+  </div>
+  <!-- Productos tendencia -->
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">🔥 Productos más vendidos (últimos 30 días)</span></div>
+      <div class="card-bd" id="tend-top-prods"></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">📉 Productos sin movimiento (+15 días)</span></div>
+      <div class="card-bd" id="tend-sin-mov"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PRESUPUESTO -->
+<div id="page-presupuesto" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>🎯 Presupuesto mensual</h1><p>Meta de ventas y control de egresos</p></div>
+    <div class="ph-right">
+      <select id="pres-mes" onchange="renderPresupuesto()" style="width:110px"></select>
+      <select id="pres-anio" onchange="renderPresupuesto()" style="width:85px"></select>
+      <button class="btn btn-grn btn-sm" onclick="openModal('m-presupuesto')">✏️ Editar metas</button>
+    </div>
+  </div>
+  <div class="sg">
+    <div class="sc"><div class="sc-lbl">Meta ventas</div><div class="sc-val c-grn mono" id="p-meta-v">$0</div></div>
+    <div class="sc"><div class="sc-lbl">Ventas reales</div><div class="sc-val mono" id="p-real-v">$0</div><div class="sc-sub" id="p-pct-v">0% de la meta</div></div>
+    <div class="sc"><div class="sc-lbl">Meta egresos</div><div class="sc-val c-red mono" id="p-meta-e">$0</div></div>
+    <div class="sc"><div class="sc-lbl">Egresos reales</div><div class="sc-val mono" id="p-real-e">$0</div><div class="sc-sub" id="p-pct-e">0% del presupuesto</div></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">Progreso vs metas</span></div>
+      <div class="card-bd" id="pres-barras"><div class="empty">Define tus metas primero</div></div>
+    </div>
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">Proyección del mes</span></div>
+      <div class="card-bd" id="pres-proyeccion"><div class="empty">Sin datos suficientes</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- CUADRE DE CAJA -->
+<div id="page-cuadre" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>💵 Cuadre de caja</h1><p>Efectivo físico vs ventas registradas</p></div>
+    <div class="ph-right"><button class="btn btn-grn btn-sm" onclick="guardarCuadre()">✓ Guardar cuadre</button></div>
+  </div>
+  <div class="two-col">
+    <div class="card">
+      <div class="card-hd"><span class="card-hd-t">Conteo de billetes y monedas</span></div>
+      <div class="card-bd">
+        <div style="display:grid;grid-template-columns:1fr 80px 80px;gap:8px;margin-bottom:8px">
+          <div style="font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase">Denominación</div>
+          <div style="font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase;text-align:center">Cantidad</div>
+          <div style="font-size:10px;color:var(--t3);font-weight:600;text-transform:uppercase;text-align:right">Subtotal</div>
+        </div>
+        <div id="cuadre-billetes"></div>
+        <div style="display:flex;justify-content:space-between;padding-top:12px;margin-top:8px;border-top:2px solid var(--bd2)">
+          <span style="font-weight:700">Total contado:</span>
+          <span class="mono c-grn" style="font-size:18px;font-weight:700" id="cuadre-total-contado">$0</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card">
+        <div class="card-hd"><span class="card-hd-t">Resumen del día</span></div>
+        <div class="card-bd" id="cuadre-resumen">
+          <div id="cuadre-ventas-ef" style="margin-bottom:10px"></div>
+          <div class="fin-row"><span style="font-size:12px">Total contado</span><span class="mono c-grn" id="cuadre-r-contado">$0</span></div>
+          <div class="fin-row"><span style="font-size:12px">Ventas efectivo registradas</span><span class="mono" id="cuadre-r-sistema">$0</span></div>
+          <div class="fin-row" style="padding-top:10px;border-top:2px solid var(--bd2)">
+            <span style="font-size:13px;font-weight:600">Diferencia</span>
+            <span class="mono" style="font-size:16px;font-weight:700" id="cuadre-r-diff">$0</span>
+          </div>
+          <div style="font-size:11px;color:var(--t2);margin-top:8px" id="cuadre-estado"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hd"><span class="card-hd-t">Historial de cuadres</span></div>
+        <div id="t-cuadres"><div class="empty">Sin cuadres guardados</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </div><!-- /pages -->
 </div><!-- /app -->
 
@@ -754,6 +996,54 @@ select option{background:var(--s3)}
   </div>
 </div>
 
+<div class="overlay" id="m-orden">
+  <div class="modal">
+    <div class="modal-title">Nueva orden de compra</div>
+    <div class="fg">
+      <div class="fgrp full"><label>Proveedor</label><select id="mo-prov" style="width:100%"><option value="">— Seleccionar —</option></select></div>
+      <div class="fgrp full"><label>Productos a pedir</label><div id="mo-items" style="margin-top:4px"></div><button class="btn btn-sec btn-xs" style="margin-top:6px" onclick="addOrdenItem()">+ Agregar producto</button></div>
+      <div class="fgrp full"><label>Fecha estimada de entrega</label><input type="date" id="mo-fecha"></div>
+      <div class="fgrp full"><label>Notas</label><input id="mo-notas" placeholder="Condiciones, descuentos acordados..."></div>
+    </div>
+    <div class="fa"><button class="btn btn-sec" onclick="closeModal('m-orden')">Cancelar</button><button class="btn btn-grn" onclick="guardarOrden()">Guardar orden</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="m-oferta">
+  <div class="modal">
+    <div class="modal-title">Registrar oferta de proveedor</div>
+    <div class="fg">
+      <div class="fgrp full"><label>Producto</label><select id="mof-prod" style="width:100%"><option value="">— Seleccionar —</option></select></div>
+      <div class="fgrp full"><label>Proveedor</label><select id="mof-prov" style="width:100%"><option value="">— Seleccionar —</option></select></div>
+      <div class="fgrp"><label>Precio normal ($)</label><input id="mof-precio-normal" type="number" min="0" readonly style="background:var(--s2);opacity:.7"></div>
+      <div class="fgrp"><label>Precio en oferta ($)</label><input id="mof-precio-oferta" type="number" min="0" oninput="calcAhorroOferta()"></div>
+      <div class="fgrp"><label>Vigente hasta</label><input type="date" id="mof-hasta"></div>
+      <div class="fgrp"><label>Cantidad mínima de compra</label><input id="mof-min" type="number" min="1" value="1" placeholder="Ej: 1 caja = 12 unidades"></div>
+      <div class="fgrp full" id="mof-ahorro-display" style="display:none">
+        <div style="background:var(--grn-bg);border:1px solid var(--grn-bd);border-radius:var(--r);padding:8px 12px;font-size:12px;color:var(--grn)">
+          Ahorro: <strong id="mof-ahorro-val"></strong> por unidad (<span id="mof-ahorro-pct"></span>)
+        </div>
+      </div>
+      <div class="fgrp full"><label>Notas</label><input id="mof-notas" placeholder="Condiciones de la oferta..."></div>
+    </div>
+    <div class="fa"><button class="btn btn-sec" onclick="closeModal('m-oferta')">Cancelar</button><button class="btn btn-grn" onclick="guardarOferta()">Guardar oferta</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="m-presupuesto">
+  <div class="modal">
+    <div class="modal-title">Definir metas del mes</div>
+    <div id="pres-form-mes" style="font-size:12px;color:var(--t2);margin-bottom:12px"></div>
+    <div class="fg">
+      <div class="fgrp"><label>Meta de ventas ($)</label><input id="mp2-ventas" type="number" min="0" placeholder="Ej: 5000000"></div>
+      <div class="fgrp"><label>Presupuesto de egresos ($)</label><input id="mp2-egresos" type="number" min="0" placeholder="Ej: 2000000"></div>
+      <div class="fgrp"><label>Meta ganancia neta ($)</label><input id="mp2-ganancia" type="number" min="0" placeholder="Ej: 1500000"></div>
+      <div class="fgrp"><label>Fondo caja menor ($)</label><input id="mp2-caja" type="number" min="0" placeholder="Ej: 200000"></div>
+    </div>
+    <div class="fa"><button class="btn btn-sec" onclick="closeModal('m-presupuesto')">Cancelar</button><button class="btn btn-grn" onclick="guardarPresupuesto()">Guardar metas</button></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <!-- FIREBASE -->
@@ -769,7 +1059,7 @@ window._fb={
   update:(p,v)=>update(ref(db,p),v),
   listen:(p,cb)=>{const r=ref(db,p);onValue(r,s=>cb(s.val()));return()=>off(r);}
 };
-['productos','ventas','egresos','stockHist','proveedores','cierres','fiados','config'].forEach(k=>{
+['productos','ventas','egresos','stockHist','proveedores','cierres','fiados','ordenes','ofertas','presupuestos','cuadres','config'].forEach(k=>{
   window._fb.listen(k,val=>{
     if(k==='config'){if(val)window.S.config={...window.S.config,...val};}
     else window.S[k]=val?Object.entries(val).map(([id,v])=>({...v,id})):[];
@@ -782,7 +1072,7 @@ setSyncOk(true);
 
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────────
-window.S={productos:[],ventas:[],egresos:[],stockHist:[],proveedores:[],cierres:[],fiados:[],config:{nombre:'Mini Mercado Claro Azul',stockMin:5,pinAdmin:'1234',pinColab:'0000'}};
+window.S={productos:[],ventas:[],egresos:[],stockHist:[],proveedores:[],cierres:[],fiados:[],ordenes:[],ofertas:[],presupuestos:[],cuadres:[],config:{nombre:'Mini Mercado Claro Azul',stockMin:5,pinAdmin:'1234',pinColab:'0000'}};
 let currentUser=null,currentPeriod='hoy',activePage='dashboard';
 let ticketItems=[],metodoPago='Efectivo',esFiado=false,descuento=0;
 let cajaFiltCat='Todos',stockFilter='todo',libroTab='todo';
@@ -852,6 +1142,12 @@ window.onDataUpdate=function(){
   else if(p==='fiados')renderFiados();
   else if(p==='egresos')renderEgresos();
   else if(p==='inventario')renderInv();
+  else if(p==='conteo')iniciarConteo();
+  else if(p==='ordenes')renderOrdenes();
+  else if(p==='ofertas')renderOfertas();
+  else if(p==='tendencias')renderTendencias();
+  else if(p==='presupuesto')renderPresupuesto();
+  else if(p==='cuadre')renderCuadre();
   else if(p==='reportes')renderReportes();
   else if(p==='libro')renderLibro();
   else if(p==='proveedores')renderProveedores();
@@ -1787,20 +2083,396 @@ window.addEventListener('online',async()=>{
   await processPendingSync();
 });
 
+// ── CONTEO FÍSICO ──────────────────────────────────────────────────────────
+let conteoData={};let conteoCatFil='Todos';
+function iniciarConteo(){
+  conteoData={};
+  const cats=['Todos',...new Set(S.productos.map(p=>p.categoria))];
+  document.getElementById('conteo-cats').innerHTML=cats.map(c=>`<button class="cpill ${c===conteoCatFil?'active':''}" onclick="setConteoCat('${c}')">${c}</button>`).join('');
+  renderConteoLista();
+}
+function setConteoCat(c){conteoCatFil=c;iniciarConteo();}
+function renderConteoLista(){
+  let prods=S.productos;
+  if(conteoCatFil!=='Todos')prods=prods.filter(p=>p.categoria===conteoCatFil);
+  const lista=document.getElementById('conteo-lista');
+  if(!prods.length){lista.innerHTML='<div class="empty">Sin productos</div>';return;}
+  lista.innerHTML=prods.map(p=>`
+    <div class="conteo-item">
+      <div style="flex:1">
+        <div class="conteo-nombre">${p.nombre}</div>
+        <div style="font-size:10px;color:var(--t3)">${catEmoji(p.categoria)} ${p.categoria}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:9px;color:var(--t3);text-transform:uppercase">Sistema</div>
+        <div class="conteo-sistema">${p.stock}</div>
+      </div>
+      <input type="number" class="conteo-input" min="0" placeholder="—"
+        oninput="updateConteoDiff('${p.id}',this.value,${p.stock})"
+        style="background:var(--s3);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:13px;text-align:center;padding:6px;outline:none"
+        onfocus="this.style.borderColor='var(--grn)'" onblur="this.style.borderColor='var(--bd)'">
+      <div class="conteo-diff" id="cdiff-${p.id}" style="color:var(--t3)">—</div>
+    </div>`).join('');
+  renderConteoDiffs();
+  document.getElementById('conteo-diff-count').textContent=prods.length+' productos';
+}
+function updateConteoDiff(id,val,sistema){
+  if(val===''){delete conteoData[id];document.getElementById('cdiff-'+id).textContent='—';document.getElementById('cdiff-'+id).style.color='var(--t3)';}
+  else{const fisico=parseInt(val)||0;const diff=fisico-sistema;conteoData[id]={fisico,sistema,diff};const el=document.getElementById('cdiff-'+id);el.textContent=(diff>=0?'+':'')+diff;el.style.color=diff===0?'var(--grn)':diff>0?'var(--amb)':'var(--red)';}
+  renderConteoDiffs();
+}
+function renderConteoDiffs(){
+  const diffs=Object.entries(conteoData).filter(([,d])=>d.diff!==0);
+  const el=document.getElementById('conteo-diffs');
+  if(!diffs.length){el.innerHTML='<div class="empty">✅ Sin diferencias</div>';document.getElementById('conteo-resumen').innerHTML='<div class="empty">Sin datos</div>';return;}
+  el.innerHTML=diffs.map(([id,d])=>{const p=S.productos.find(x=>x.id===id);return`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bd)"><div><div style="font-size:12px;font-weight:500">${p?.nombre||id}</div><div style="font-size:10px;color:var(--t2)">Sistema: ${d.sistema} → Físico: ${d.fisico}</div></div><div class="mono" style="font-size:13px;font-weight:700;color:${d.diff>0?'var(--amb)':'var(--red)'}">${d.diff>0?'+':''}${d.diff}</div></div>`;}).join('');
+  const sobrantes=diffs.filter(([,d])=>d.diff>0).length;
+  const faltantes=diffs.filter(([,d])=>d.diff<0).length;
+  document.getElementById('conteo-resumen').innerHTML=`
+    <div class="fin-row"><span>Productos contados</span><span class="mono">${Object.keys(conteoData).length}</span></div>
+    <div class="fin-row"><span style="color:var(--amb)">Sobrantes</span><span class="mono c-amb">${sobrantes}</span></div>
+    <div class="fin-row"><span style="color:var(--red)">Faltantes</span><span class="mono c-red">${faltantes}</span></div>
+    <div class="fin-row"><span>Total diferencias</span><span class="mono">${diffs.length}</span></div>`;
+}
+async function aplicarConteo(){
+  const diffs=Object.entries(conteoData).filter(([,d])=>d.diff!==0);
+  if(!diffs.length){showToast('No hay diferencias que ajustar','warn');return;}
+  if(!confirm(`¿Aplicar ${diffs.length} ajuste(s) de inventario?`))return;
+  for(const[id,d]of diffs){
+    const p=S.productos.find(x=>x.id===id);if(!p)continue;
+    await fbSafe('update','productos/'+id,{stock:d.fisico});
+    await fbSafe('push','stockHist',{prodId:id,nombre:p.nombre,antes:d.sistema,despues:d.fisico,delta:d.diff,motivo:'Conteo físico',fecha:today(),vendidoPor:currentUser==='admin'?'Admin':'Colaborador'});
+  }
+  conteoData={};showToast(`✓ ${diffs.length} ajustes aplicados`);iniciarConteo();
+}
+function exportConteo(){
+  if(!window.XLSX)return;
+  const rows=S.productos.map(p=>({Producto:p.nombre,Categoría:p.categoria,'Stock sistema':p.stock,'Stock físico':conteoData[p.id]?.fisico??'',Diferencia:conteoData[p.id]?.diff??''}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Conteo');XLSX.writeFile(wb,`Conteo_${today()}.xlsx`);
+}
+
+// ── ÓRDENES DE COMPRA ──────────────────────────────────────────────────────
+let ordenItems=[];
+function generarOrden(){
+  const bajos=S.productos.filter(p=>p.stock<=p.stockMin);
+  if(!bajos.length){showToast('No hay productos bajo stock mínimo','warn');return;}
+  const body=document.getElementById('orden-sugerida-body');
+  body.innerHTML=`<div style="margin-bottom:12px;font-size:12px;color:var(--t2)">${bajos.length} productos necesitan reposición:</div>`+
+    bajos.map(p=>{const sugerido=Math.max(p.stockMin*3,10);return`<div class="orden-item"><div style="flex:1"><div class="orden-nombre">${p.nombre}<span class="oferta-badge">${p.stock===0?'AGOTADO':'BAJO'}</span></div><div class="orden-stock">Stock actual: ${p.stock} | Mínimo: ${p.stockMin} | Proveedor: ${p.proveedor||'—'}</div></div><div style="display:flex;align-items:center;gap:6px"><span style="font-size:11px;color:var(--t2)">Pedir:</span><input type="number" value="${sugerido}" min="1" style="width:65px;background:var(--s3);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:13px;text-align:center;padding:5px;outline:none" id="ord-qty-${p.id}"></div></div>`;}).join('');
+  document.getElementById('orden-sugerida').style.display='';
+}
+async function confirmarOrden(){
+  const bajos=S.productos.filter(p=>p.stock<=p.stockMin);
+  const items=bajos.map(p=>{const qty=parseInt(document.getElementById('ord-qty-'+p.id)?.value)||0;return{prodId:p.id,nombre:p.nombre,qty,proveedor:p.proveedor||'',costo:p.costo};}).filter(i=>i.qty>0);
+  if(!items.length)return;
+  const total=items.reduce((s,i)=>s+i.qty*i.costo,0);
+  await fbSafe('push','ordenes',{fecha:today(),items,total,estado:'Pendiente',notas:'Generada automáticamente',creadoPor:currentUser==='admin'?'Admin':'Colaborador'});
+  document.getElementById('orden-sugerida').style.display='none';
+  showToast('Orden registrada ✓');
+}
+function addOrdenItem(){
+  ordenItems.push({prodId:'',qty:1});renderOrdenItems();
+}
+function renderOrdenItems(){
+  const cont=document.getElementById('mo-items');
+  cont.innerHTML=ordenItems.map((item,i)=>`<div style="display:grid;grid-template-columns:1fr 70px 24px;gap:6px;margin-bottom:5px">
+    <select onchange="ordenItems[${i}].prodId=this.value" style="width:100%;background:var(--s3);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);font-family:var(--font);font-size:12px;padding:7px;outline:none">
+      <option value="">— Producto —</option>${S.productos.map(p=>`<option value="${p.id}" ${item.prodId===p.id?'selected':''}>${p.nombre}</option>`).join('')}
+    </select>
+    <input type="number" min="1" value="${item.qty}" placeholder="Cant." onchange="ordenItems[${i}].qty=parseInt(this.value)||1" style="background:var(--s3);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:12px;text-align:center;padding:7px;outline:none">
+    <button onclick="ordenItems.splice(${i},1);renderOrdenItems()" style="background:var(--red-bg);border:1px solid var(--red-bd);color:var(--red);border-radius:var(--r);cursor:pointer;font-size:13px">✕</button>
+  </div>`).join('');
+}
+async function guardarOrden(){
+  const prov=document.getElementById('mo-prov').value;
+  const items=ordenItems.filter(i=>i.prodId&&i.qty>0);
+  if(!items.length){showToast('Agrega al menos un producto','warn');return;}
+  const itemsData=items.map(i=>{const p=S.productos.find(x=>x.id===i.prodId);return{prodId:i.prodId,nombre:p?.nombre||'',qty:i.qty,costo:p?.costo||0,proveedor:p?.proveedor||''};});
+  const total=itemsData.reduce((s,i)=>s+i.qty*i.costo,0);
+  await fbSafe('push','ordenes',{fecha:today(),proveedor:prov,items:itemsData,total,estado:'Pendiente',fechaEntrega:document.getElementById('mo-fecha').value,notas:document.getElementById('mo-notas').value,creadoPor:currentUser==='admin'?'Admin':'Colaborador'});
+  ordenItems=[];closeModal('m-orden');showToast('Orden guardada ✓');
+}
+function renderOrdenes(){
+  const tb=document.getElementById('t-ordenes');
+  if(!S.ordenes.length){tb.innerHTML='<tr><td colspan="6" class="empty">Sin órdenes</td></tr>';return;}
+  const sorted=[...S.ordenes].sort((a,b)=>b.fecha.localeCompare(a.fecha));
+  tb.innerHTML=sorted.map(o=>`<tr>
+    <td>${o.fecha}</td><td style="color:var(--t2)">${o.proveedor||'Varios'}</td>
+    <td style="font-size:11px;color:var(--t2)">${o.items?o.items.map(i=>`${i.nombre}×${i.qty}`).join(', ').slice(0,50):''}</td>
+    <td class="mono c-amb">${fmt(o.total||0)}</td>
+    <td><span class="badge ${o.estado==='Recibida'?'bg':o.estado==='Pendiente'?'ba':'bb'}">${o.estado||'Pendiente'}</span></td>
+    <td style="white-space:nowrap">
+      ${o.estado!=='Recibida'?`<button class="btn btn-grn btn-xs" onclick="marcarOrdenRecibida('${o.id}')">✓ Recibida</button>`:''}
+      <button class="btn btn-red btn-xs" onclick="delOrden('${o.id}')">✕</button>
+    </td>
+  </tr>`).join('');
+}
+async function marcarOrdenRecibida(id){
+  if(!confirm('¿Marcar como recibida? Esto actualizará el stock de los productos.'))return;
+  const orden=S.ordenes.find(o=>o.id===id);if(!orden)return;
+  for(const item of(orden.items||[])){
+    const p=S.productos.find(x=>x.id===item.prodId);
+    if(p){const ant=p.stock,nw=ant+item.qty;await fbSafe('update','productos/'+p.id,{stock:nw});await fbSafe('push','stockHist',{prodId:p.id,nombre:p.nombre,antes:ant,despues:nw,delta:item.qty,motivo:'Orden de compra recibida',fecha:today(),vendidoPor:'Admin'});}
+  }
+  await fbSafe('update','ordenes/'+id,{estado:'Recibida',fechaRecibida:today()});
+  showToast('Orden marcada como recibida — stock actualizado ✓');
+}
+async function delOrden(id){if(!confirm('¿Eliminar?'))return;await fbSafe('remove','ordenes/'+id);}
+function exportOrden(){
+  if(!window.XLSX)return;
+  const bajos=S.productos.filter(p=>p.stock<=p.stockMin);
+  const rows=bajos.map(p=>({Producto:p.nombre,Categoría:p.categoria,Proveedor:p.proveedor||'—','Stock actual':p.stock,'Stock mínimo':p.stockMin,'Cantidad sugerida':Math.max(p.stockMin*3,10),'Costo unitario':p.costo,'Total estimado':Math.max(p.stockMin*3,10)*p.costo}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Orden de compra');XLSX.writeFile(wb,`OrdenCompra_${today()}.xlsx`);
+}
+
+// ── OFERTAS ────────────────────────────────────────────────────────────────
+function calcAhorroOferta(){
+  const normal=parseFloat(document.getElementById('mof-precio-normal').value)||0;
+  const oferta=parseFloat(document.getElementById('mof-precio-oferta').value)||0;
+  const wrap=document.getElementById('mof-ahorro-display');
+  if(normal>0&&oferta>0&&oferta<normal){
+    const ahorro=normal-oferta;const pct2=((ahorro/normal)*100).toFixed(1);
+    document.getElementById('mof-ahorro-val').textContent=fmt(ahorro);
+    document.getElementById('mof-ahorro-pct').textContent=pct2+'%';
+    wrap.style.display='';
+  }else wrap.style.display='none';
+}
+async function guardarOferta(){
+  const prodId=document.getElementById('mof-prod').value;
+  const precioOferta=parseFloat(document.getElementById('mof-precio-oferta').value)||0;
+  if(!prodId||!precioOferta){showToast('Producto y precio son obligatorios','warn');return;}
+  const p=S.productos.find(x=>x.id===prodId);
+  await fbSafe('push','ofertas',{prodId,nombreProd:p?.nombre||'',proveedor:document.getElementById('mof-prov').value,precioNormal:p?.costo||0,precioOferta,hasta:document.getElementById('mof-hasta').value,minCompra:parseInt(document.getElementById('mof-min').value)||1,notas:document.getElementById('mof-notas').value,activa:true,fecha:today()});
+  closeModal('m-oferta');showToast('Oferta registrada ✓');
+}
+function renderOfertas(){
+  const today2=today();
+  const activas=S.ofertas.filter(o=>o.activa&&(!o.hasta||o.hasta>=today2));
+  const of=document.getElementById('ofertas-activas');
+  if(activas.length){
+    of.innerHTML=`<div style="background:var(--grn-bg);border:1px solid var(--grn-bd);border-radius:var(--rlg);padding:14px;margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:var(--grn);margin-bottom:10px">🏷️ ${activas.length} oferta(s) activa(s)</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">`+
+      activas.map(o=>`<div style="background:var(--s2);border-radius:var(--r);padding:10px;border:1px solid var(--grn-bd)"><div style="font-weight:600;font-size:12px">${o.nombreProd}</div><div style="font-size:11px;color:var(--t2);margin-top:2px">${o.proveedor||'—'}</div><div style="display:flex;justify-content:space-between;margin-top:6px"><span class="mono" style="text-decoration:line-through;color:var(--t3)">${fmt(o.precioNormal)}</span><span class="mono c-grn" style="font-weight:700">${fmt(o.precioOferta)}</span></div><div style="font-size:10px;color:var(--amb);margin-top:3px">Hasta: ${o.hasta||'Sin fecha'}</div></div>`).join('')+
+      '</div></div>';
+  }else of.innerHTML='';
+  const tb=document.getElementById('t-ofertas');
+  if(!S.ofertas.length){tb.innerHTML='<tr><td colspan="8" class="empty">Sin ofertas</td></tr>';return;}
+  tb.innerHTML=[...S.ofertas].sort((a,b)=>b.fecha.localeCompare(a.fecha)).map(o=>{
+    const vencida=o.hasta&&o.hasta<today2;const ahorro=o.precioNormal-o.precioOferta;const pct2=o.precioNormal>0?((ahorro/o.precioNormal)*100).toFixed(0):0;
+    return`<tr><td><strong>${o.nombreProd}</strong></td><td style="color:var(--t2)">${o.proveedor||'—'}</td><td class="mono">${fmt(o.precioNormal)}</td><td class="mono c-grn">${fmt(o.precioOferta)}</td><td class="mono c-amb">${pct2}%</td><td>${o.hasta||'—'}</td><td><span class="badge ${vencida?'br':o.activa?'bg':'ba'}">${vencida?'Vencida':o.activa?'Activa':'Inactiva'}</span></td><td><button class="btn btn-red btn-xs" onclick="delOferta('${o.id}')">✕</button></td></tr>`;
+  }).join('');
+}
+async function delOferta(id){if(!confirm('¿Eliminar oferta?'))return;await fbSafe('remove','ofertas/'+id);}
+
+// ── TENDENCIAS ─────────────────────────────────────────────────────────────
+function renderTendencias(){
+  const anio=parseInt(document.getElementById('tend-anio')?.value||new Date().getFullYear());
+  const meses=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  // Ventas por mes
+  const porMes=Array(12).fill(0);
+  S.ventas.filter(v=>new Date(v.fecha+'T12:00:00').getFullYear()===anio).forEach(v=>{const m=new Date(v.fecha+'T12:00:00').getMonth();porMes[m]+=v.total;});
+  const maxM=Math.max(...porMes,1);
+  document.getElementById('chart-mensual').innerHTML=meses.map((m,i)=>`<div class="chart-v-bar-wrap">
+    <div class="chart-v-val">${porMes[i]>0?fmt(porMes[i]).replace('$',''):'—'}</div>
+    <div class="chart-v-bar" style="height:${Math.max(4,(porMes[i]/maxM)*140)}px;background:${porMes[i]>0?'var(--grn)':'var(--s3)'}" title="${fmt(porMes[i])}"></div>
+    <div class="chart-v-label">${m}</div>
+  </div>`).join('');
+  // Horas pico
+  const porHora=Array(24).fill(0);
+  S.ventas.filter(v=>v.hora).forEach(v=>{const h=parseInt(v.hora.split(':')[0]);if(h>=0&&h<24)porHora[h]+=v.total;});
+  const maxH=Math.max(...porHora,1);
+  const horasPico=porHora.map((v,i)=>({h:i,v})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const topHora=horasPico[0];
+  document.getElementById('chart-horas').innerHTML=Array.from({length:24},(_,i)=>`<div class="chart-v-bar-wrap">
+    <div class="chart-v-bar" style="height:${Math.max(2,(porHora[i]/maxH)*110)}px;background:${porHora[i]>0?'var(--blu)':'var(--s3)'}"></div>
+    <div class="chart-v-label" style="font-size:8px">${i%4===0?i+'h':''}</div>
+  </div>`).join('');
+  document.getElementById('hora-pico-lbl').textContent=topHora?`Hora pico: ${topHora.h}:00 — ${fmt(topHora.v)} en ventas`:'Sin datos suficientes';
+  // Días de la semana
+  const dias=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const porDia=Array(7).fill(0);
+  S.ventas.forEach(v=>{const d=new Date(v.fecha+'T12:00:00').getDay();porDia[d]+=v.total;});
+  const maxD=Math.max(...porDia,1);
+  const topDia=porDia.map((v,i)=>({d:i,v})).sort((a,b)=>b.v-a.v)[0];
+  document.getElementById('chart-dias').innerHTML=dias.map((d,i)=>`<div class="chart-v-bar-wrap">
+    <div class="chart-v-bar" style="height:${Math.max(2,(porDia[i]/maxD)*110)}px;background:${i===0||i===6?'var(--pur)':'var(--blu)'}"></div>
+    <div class="chart-v-label">${d}</div>
+  </div>`).join('');
+  document.getElementById('dia-pico-lbl').textContent=topDia&&topDia.v>0?`Día con más ventas: ${dias[topDia.d]} — ${fmt(topDia.v)}`:'Sin datos';
+  // Top productos últimos 30 días
+  const h30=new Date();h30.setDate(h30.getDate()-30);
+  const pv={};S.ventas.filter(v=>new Date(v.fecha+'T12:00:00')>=h30).forEach(v=>v.items?.forEach(i=>{pv[i.nombre]=(pv[i.nombre]||0)+i.qty;}));
+  const top=Object.entries(pv).sort((a,b)=>b[1]-a[1]).slice(0,8);const maxP=top[0]?top[0][1]:1;
+  document.getElementById('tend-top-prods').innerHTML=top.length?'<div class="cbars">'+top.map(([n,q])=>`<div class="cb-row"><div class="cb-lbl">${n}</div><div class="cb-bg"><div class="cb-fill" style="width:${(q/maxP*100)}%;background:var(--grn)"><span>${q}</span></div></div><div class="cb-val">${q} uds</div></div>`).join('')+'</div>':'<div class="empty">Sin ventas</div>';
+  // Sin movimiento
+  const vendidos=new Set(S.ventas.filter(v=>new Date(v.fecha+'T12:00:00')>=h30).flatMap(v=>v.items?.map(i=>i.prodId)||[]));
+  const sinMov=S.productos.filter(p=>!vendidos.has(p.id)&&p.stock>0);
+  document.getElementById('tend-sin-mov').innerHTML=sinMov.length?
+    '<div style="display:flex;flex-direction:column;gap:5px">'+sinMov.slice(0,10).map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--bd)"><div><div style="font-size:12px;font-weight:500">${p.nombre}</div><div style="font-size:10px;color:var(--t3)">${p.categoria} · Stock: ${p.stock}</div></div><span class="badge ba">Sin ventas</span></div>`).join('')+'</div>':
+    '<div class="empty">✅ Todos los productos se han vendido recientemente</div>';
+}
+
+// ── PRESUPUESTO ────────────────────────────────────────────────────────────
+function renderPresupuesto(){
+  const mes=parseInt(document.getElementById('pres-mes')?.value??new Date().getMonth());
+  const anio=parseInt(document.getElementById('pres-anio')?.value??new Date().getFullYear());
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('pres-form-mes').textContent=`Metas para: ${meses[mes]} ${anio}`;
+  const key=`${anio}-${mes}`;
+  const pres=S.presupuestos.find(p=>p.key===key)||{metaVentas:0,metaEgresos:0,metaGanancia:0};
+  document.getElementById('p-meta-v').textContent=fmt(pres.metaVentas||0);
+  document.getElementById('p-meta-e').textContent=fmt(pres.metaEgresos||0);
+  const fil=v=>{const d=new Date(v+'T12:00:00');return d.getMonth()===mes&&d.getFullYear()===anio;};
+  const vm=S.ventas.filter(v=>fil(v.fecha));const em=S.egresos.filter(e=>fil(e.fecha));
+  const tv=vm.reduce((s,v)=>s+v.total,0),tc=vm.reduce((s,v)=>s+v.costoTotal,0),te=em.reduce((s,e)=>s+e.monto,0);
+  const gn=tv-tc-te;
+  document.getElementById('p-real-v').textContent=fmt(tv);document.getElementById('p-real-e').textContent=fmt(te);
+  const pctV=pres.metaVentas>0?Math.min(200,(tv/pres.metaVentas)*100).toFixed(0):0;
+  const pctE=pres.metaEgresos>0?Math.min(200,(te/pres.metaEgresos)*100).toFixed(0):0;
+  document.getElementById('p-pct-v').textContent=pctV+'% de la meta';
+  document.getElementById('p-pct-e').textContent=pctE+'% del presupuesto';
+  if(!pres.metaVentas){document.getElementById('pres-barras').innerHTML='<div class="empty">Define tus metas primero → toca "Editar metas"</div>';document.getElementById('pres-proyeccion').innerHTML='<div class="empty">Sin metas definidas</div>';return;}
+  // Barras de progreso
+  const items=[
+    {label:'Ventas',real:tv,meta:pres.metaVentas,color:'var(--grn)'},
+    {label:'Egresos',real:te,meta:pres.metaEgresos,color:'var(--red)',invertir:true},
+    {label:'Ganancia neta',real:gn,meta:pres.metaGanancia,color:gn>=0?'var(--grn)':'var(--red)'},
+  ];
+  document.getElementById('pres-barras').innerHTML=items.map(item=>{
+    const pct2=item.meta>0?Math.min(100,(Math.abs(item.real)/item.meta)*100):0;
+    const ok=item.invertir?item.real<=item.meta:item.real>=item.meta;
+    return`<div class="pres-row">
+      <div class="pres-label">${item.label}</div>
+      <div class="pres-bars">
+        <div class="pres-bar-bg"><div class="pres-bar-fill" style="width:${pct2}%;background:${item.color}"></div></div>
+        <div class="pres-nums"><span>${fmt(item.real)}</span><span>Meta: ${fmt(item.meta)}</span></div>
+      </div>
+      <span class="badge ${ok?'bg':'br'}" style="margin-left:8px;flex-shrink:0">${pct2.toFixed(0)}%</span>
+    </div>`;
+  }).join('');
+  // Proyección
+  const diasMes=new Date(anio,mes+1,0).getDate();
+  const diaActual=mes===new Date().getMonth()&&anio===new Date().getFullYear()?new Date().getDate():diasMes;
+  const ventaDiaria=diaActual>0?tv/diaActual:0;
+  const proyVentas=Math.round(ventaDiaria*diasMes);
+  const diff=proyVentas-pres.metaVentas;
+  document.getElementById('pres-proyeccion').innerHTML=`
+    <div class="fin-row"><span>Días transcurridos</span><span class="mono">${diaActual}/${diasMes}</span></div>
+    <div class="fin-row"><span>Promedio diario</span><span class="mono">${fmt(ventaDiaria)}</span></div>
+    <div class="fin-row"><span>Proyección del mes</span><span class="mono ${proyVentas>=pres.metaVentas?'c-grn':'c-red'}">${fmt(proyVentas)}</span></div>
+    <div class="fin-row"><span>vs Meta</span><span class="mono ${diff>=0?'c-grn':'c-red'}">${diff>=0?'+':''}${fmt(diff)}</span></div>
+    <div style="margin-top:10px;padding:8px;background:${proyVentas>=pres.metaVentas?'var(--grn-bg)':'var(--red-bg)'};border-radius:var(--r);font-size:11px;color:${proyVentas>=pres.metaVentas?'var(--grn)':'var(--red)'}">
+      ${proyVentas>=pres.metaVentas?'✅ A este ritmo superarás la meta del mes':'⚠️ A este ritmo no alcanzarás la meta — necesitas '+fmt((pres.metaVentas-tv)/(diasMes-diaActual||1))+'/día'}
+    </div>`;
+}
+async function guardarPresupuesto(){
+  const mes=parseInt(document.getElementById('pres-mes')?.value??new Date().getMonth());
+  const anio=parseInt(document.getElementById('pres-anio')?.value??new Date().getFullYear());
+  const key=`${anio}-${mes}`;
+  const existing=S.presupuestos.find(p=>p.key===key);
+  const data={key,mes,anio,metaVentas:parseFloat(document.getElementById('mp2-ventas').value)||0,metaEgresos:parseFloat(document.getElementById('mp2-egresos').value)||0,metaGanancia:parseFloat(document.getElementById('mp2-ganancia').value)||0,cajaFondo:parseFloat(document.getElementById('mp2-caja').value)||0};
+  if(existing)await fbSafe('update','presupuestos/'+existing.id,data);
+  else await fbSafe('push','presupuestos',data);
+  closeModal('m-presupuesto');showToast('Metas guardadas ✓');
+}
+
+// ── CUADRE DE CAJA ─────────────────────────────────────────────────────────
+const DENOMINACIONES=[100000,50000,20000,10000,5000,2000,1000,500,200,100,50];
+function renderCuadre(){
+  const bil=document.getElementById('cuadre-billetes');
+  bil.innerHTML=DENOMINACIONES.map(d=>`
+    <div class="cuadre-denom">
+      <div style="font-size:12px;font-weight:500;font-family:var(--mono)">${fmt(d)}</div>
+      <input type="number" min="0" value="0" id="bil-${d}" oninput="calcCuadre()"
+        style="background:var(--s3);border:1px solid var(--bd);border-radius:var(--r);color:var(--t1);font-family:var(--mono);font-size:13px;text-align:center;padding:6px;outline:none;width:80px"
+        onfocus="this.style.borderColor='var(--grn)'" onblur="this.style.borderColor='var(--bd)'">
+      <div class="mono" style="text-align:right;font-size:12px;color:var(--t2)" id="bil-sub-${d}">$0</div>
+    </div>`).join('');
+  calcCuadre();
+  renderCuadresHistorial();
+}
+function calcCuadre(){
+  let total=0;
+  DENOMINACIONES.forEach(d=>{
+    const qty=parseInt(document.getElementById('bil-'+d)?.value)||0;
+    const sub=qty*d;total+=sub;
+    const el=document.getElementById('bil-sub-'+d);
+    if(el)el.textContent=sub>0?fmt(sub):'$0';
+  });
+  document.getElementById('cuadre-total-contado').textContent=fmt(total);
+  document.getElementById('cuadre-r-contado').textContent=fmt(total);
+  // Ventas en efectivo de hoy
+  const ventasEf=S.ventas.filter(v=>v.fecha===today()&&v.metodoPago==='Efectivo').reduce((s,v)=>s+v.total,0);
+  document.getElementById('cuadre-r-sistema').textContent=fmt(ventasEf);
+  const diff=total-ventasEf;
+  const diffEl=document.getElementById('cuadre-r-diff');
+  diffEl.textContent=(diff>=0?'+':'')+fmt(diff);
+  diffEl.style.color=diff===0?'var(--grn)':diff>0?'var(--amb)':'var(--red)';
+  document.getElementById('cuadre-estado').textContent=diff===0?'✅ Caja cuadra perfectamente':diff>0?`⚠️ Sobran ${fmt(diff)} en caja`:`⛔ Faltan ${fmt(Math.abs(diff))} en caja`;
+}
+async function guardarCuadre(){
+  let totalContado=0;const desglose={};
+  DENOMINACIONES.forEach(d=>{const qty=parseInt(document.getElementById('bil-'+d)?.value)||0;if(qty>0){desglose[d]=qty;totalContado+=qty*d;}});
+  const ventasEf=S.ventas.filter(v=>v.fecha===today()&&v.metodoPago==='Efectivo').reduce((s,v)=>s+v.total,0);
+  await fbSafe('push','cuadres',{fecha:today(),hora:nowTime(),totalContado,ventasEfectivo:ventasEf,diferencia:totalContado-ventasEf,desglose,cuadradoPor:currentUser==='admin'?'Admin':'Colaborador'});
+  showToast('Cuadre guardado ✓');renderCuadresHistorial();
+}
+function renderCuadresHistorial(){
+  const sorted=[...S.cuadres].sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,10);
+  document.getElementById('t-cuadres').innerHTML=sorted.length?
+    `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Contado</th><th>Sistema</th><th>Diferencia</th><th>Por</th></tr></thead><tbody>`+
+    sorted.map(c=>`<tr><td>${c.fecha}</td><td style="color:var(--t3)">${c.hora||'—'}</td><td class="mono c-grn">${fmt(c.totalContado)}</td><td class="mono">${fmt(c.ventasEfectivo)}</td><td class="mono ${c.diferencia===0?'c-grn':c.diferencia>0?'c-amb':'c-red'}">${c.diferencia>=0?'+':''}${fmt(c.diferencia)}</td><td>${c.cuadradoPor||'—'}</td></tr>`).join('')+`</tbody></table>`:
+    '<div class="empty">Sin cuadres guardados</div>';
+}
+
+// ── INIT MODALES NUEVOS ────────────────────────────────────────────────────
+const _origOpenModal=openModal;
+function openModal(id){
+  if(id==='m-orden'){
+    ordenItems=[{prodId:'',qty:1}];
+    document.getElementById('mo-prov').innerHTML='<option value="">— Todos —</option>'+S.proveedores.map(p=>`<option value="${p.nombre}">${p.nombre}</option>`).join('');
+    document.getElementById('mo-fecha').value='';
+    document.getElementById('mo-notas').value='';
+    renderOrdenItems();
+  }
+  if(id==='m-oferta'){
+    document.getElementById('mof-prod').innerHTML='<option value="">— Seleccionar —</option>'+S.productos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+    document.getElementById('mof-prov').innerHTML='<option value="">— Seleccionar —</option>'+S.proveedores.map(p=>`<option value="${p.nombre}">${p.nombre}</option>`).join('');
+    ['mof-precio-oferta','mof-notas'].forEach(x=>document.getElementById(x).value='');
+    document.getElementById('mof-precio-normal').value='';
+    document.getElementById('mof-min').value=1;
+    document.getElementById('mof-hasta').value='';
+    document.getElementById('mof-ahorro-display').style.display='none';
+    document.getElementById('mof-prod').onchange=function(){
+      const p=S.productos.find(x=>x.id===this.value);
+      if(p)document.getElementById('mof-precio-normal').value=p.costo;
+    };
+  }
+  if(id==='m-presupuesto'){
+    const mes=parseInt(document.getElementById('pres-mes')?.value??new Date().getMonth());
+    const anio=parseInt(document.getElementById('pres-anio')?.value??new Date().getFullYear());
+    const key=`${anio}-${mes}`;const pres=S.presupuestos.find(p=>p.key===key)||{};
+    document.getElementById('mp2-ventas').value=pres.metaVentas||'';
+    document.getElementById('mp2-egresos').value=pres.metaEgresos||'';
+    document.getElementById('mp2-ganancia').value=pres.metaGanancia||'';
+    document.getElementById('mp2-caja').value=pres.cajaFondo||'';
+  }
+  _origOpenModal(id);
+}
+
 // ── INIT ───────────────────────────────────────────────────────────────────
 const curM=new Date().getMonth(),curY=new Date().getFullYear();
 const mesesN=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-['rep-mes','lib-mes'].forEach(id=>{
+['rep-mes','lib-mes','pres-mes'].forEach(id=>{
   const el=document.getElementById(id);if(!el)return;
   el.innerHTML=mesesN.map((m,i)=>`<option value="${i}" ${i===curM?'selected':''}>${m}</option>`).join('');
 });
-['rep-anio','lib-anio'].forEach(id=>{
+['rep-anio','lib-anio','pres-anio','tend-anio'].forEach(id=>{
   const el=document.getElementById(id);if(!el)return;
-  for(let y=curY-2;y<=curY+1;y++)el.innerHTML+=`<option value="${y}" ${y===curY?'selected':''}>${y}</option>`;
+  el.innerHTML='';for(let y=curY-2;y<=curY+1;y++)el.innerHTML+=`<option value="${y}" ${y===curY?'selected':''}>${y}</option>`;
 });
 ['cierre-fil-mes'].forEach(id=>{
   const el=document.getElementById(id);if(!el)return;
-  mesesN.forEach((m,i)=>el.innerHTML+=`<option value="${i}">${m}</option>`);
+  el.innerHTML='<option value="">Todos los meses</option>'+mesesN.map((m,i)=>`<option value="${i}">${m}</option>`).join('');
 });
 ['cierre-fil-anio'].forEach(id=>{
   const el=document.getElementById(id);if(!el)return;

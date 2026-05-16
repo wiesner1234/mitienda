@@ -351,6 +351,7 @@ select option{background:var(--s3)}
   <div class="nav-sep admin-only"></div>
   <div class="nav-section admin-only">Análisis</div>
   <button class="nav-btn admin-only" onclick="goTo('reportes')"><span class="nav-icon">📈</span>Reportes</button>
+  <button class="nav-btn admin-only" onclick="goTo('libro')"><span class="nav-icon">📒</span>Libro contable</button>
   <button class="nav-btn admin-only" onclick="goTo('cierres')"><span class="nav-icon">🔐</span>Cierre caja</button>
   <div class="sidebar-bottom">
     <div class="nav-sep"></div>
@@ -564,6 +565,58 @@ select option{background:var(--s3)}
     <thead><tr><th>Nombre</th><th>Teléfono</th><th>WhatsApp</th><th>Productos</th><th>Días de visita</th><th>Notas</th><th></th></tr></thead>
     <tbody id="t-proveedores"><tr><td colspan="7" class="empty">Agrega proveedores</td></tr></tbody>
   </table></div></div>
+</div>
+
+<!-- LIBRO CONTABLE -->
+<div id="page-libro" class="page">
+  <div class="ph">
+    <div class="ph-left"><h1>📒 Libro Contable</h1><p>Registro detallado estilo DIAN — ventas, compras, gastos</p></div>
+    <div class="ph-right">
+      <select id="lib-mes" onchange="renderLibro()" style="width:110px">
+        <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+        <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+        <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+        <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+      </select>
+      <select id="lib-anio" onchange="renderLibro()" style="width:85px">
+        <option value="2025">2025</option><option value="2026" selected>2026</option>
+      </select>
+      <button class="btn btn-blu btn-sm" onclick="exportLibro()">⬇ Excel DIAN</button>
+    </div>
+  </div>
+
+  <!-- Resumen del período -->
+  <div class="sg" style="margin-bottom:14px">
+    <div class="sc"><div class="sc-lbl">Total ingresos</div><div class="sc-val c-grn mono" id="lib-ing">$0</div><div class="sc-sub">ventas del mes</div></div>
+    <div class="sc"><div class="sc-lbl">Total egresos</div><div class="sc-val c-red mono" id="lib-egr">$0</div><div class="sc-sub">gastos + pagos + costos</div></div>
+    <div class="sc"><div class="sc-lbl">Utilidad neta</div><div class="sc-val mono" id="lib-util">$0</div></div>
+    <div class="sc"><div class="sc-lbl">Transacciones</div><div class="sc-val mono" id="lib-trans">0</div></div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="ptabs" style="margin-bottom:14px">
+    <button class="ptab active" onclick="setLibroTab('todo',this)">Todo</button>
+    <button class="ptab" onclick="setLibroTab('ingresos',this)">Ingresos</button>
+    <button class="ptab" onclick="setLibroTab('egresos',this)">Egresos</button>
+    <button class="ptab" onclick="setLibroTab('compras',this)">Compras/Pagos</button>
+  </div>
+
+  <div class="card">
+    <div class="card-hd">
+      <span class="card-hd-t">Registro de transacciones</span>
+      <span id="lib-count" style="font-size:11px;color:var(--t2)"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table id="lib-tabla">
+        <thead><tr>
+          <th>Fecha</th><th>Hora</th><th>Tipo</th><th>Concepto</th>
+          <th>Detalle</th><th>Responsable</th><th>Método pago</th>
+          <th>Ingreso</th><th>Egreso</th><th>Saldo acum.</th>
+        </tr></thead>
+        <tbody id="lib-tbody"><tr><td colspan="10" class="empty">Sin registros</td></tr></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- CIERRES -->
@@ -817,6 +870,7 @@ window.onDataUpdate=function(){
   else if(p==='reportes')renderReportes();
   else if(p==='proveedores')renderProveedores();
   else if(p==='cierres')renderCierres();
+  else if(p==='libro')renderLibro();
 };
 window.addEventListener('online',()=>{document.getElementById('offline-banner').classList.remove('show');setSyncOk(true);});
 window.addEventListener('offline',()=>{document.getElementById('offline-banner').classList.add('show');setSyncOk(false);});
@@ -867,44 +921,59 @@ function loginAs(role){
 function logout(){currentUser=null;pinBuf='';updateDots();document.getElementById('login-screen').style.display='flex';document.getElementById('app').style.display='none';}
 
 // ── SCANNER USB ─────────────────────────────────────────────────────────────
-// El escáner USB funciona como teclado — escribe el código y pulsa Enter
-// Capturamos el input globalmente para que funcione desde cualquier página
-let scanBuffer='';let scanTimer=null;
+let scanBuffer='';let scanTimer=null;let lastScanTime=0;
 function initScannerListener(){
   document.addEventListener('keydown',handleScannerKey);
 }
 function handleScannerKey(e){
-  // Si el foco está en un input normal, no interceptar (excepto la caja)
   const tag=document.activeElement.tagName;
-  const isCajaQ=document.activeElement.id==='caja-q';
+  const activeId=document.activeElement.id;
 
   // Enter = el escáner terminó de escribir el código
   if(e.key==='Enter'){
     if(scanBuffer.length>=4){
       const code=scanBuffer.trim();
       scanBuffer='';clearTimeout(scanTimer);
+      // Limpiar campo de búsqueda si el escáner escribió ahí
+      const cajaQ=document.getElementById('caja-q');
+      if(cajaQ&&cajaQ.value===code){cajaQ.value='';renderCajaGrid();}
       processScannerCode(code);
       e.preventDefault();
+      return;
     }
+    scanBuffer='';
     return;
   }
 
-  // Solo capturar si son caracteres del código (números y letras, no teclas especiales)
-  if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
-    // Si el foco está en un input que NO es el de caja, dejar que escriba normal
-    if(tag==='INPUT'||tag==='TEXTAREA'){
-      if(!isCajaQ)return; // escribir en input normal
-    }
-    scanBuffer+=e.key;
-    // Limpiar buffer si no llega Enter en 100ms (escritura humana vs escáner rápido)
-    clearTimeout(scanTimer);
-    scanTimer=setTimeout(()=>{
-      if(scanBuffer.length<4)scanBuffer=''; // demasiado lento = humano, no escáner
-    },100);
-    // Mostrar indicador de escáner activo
-    updateScannerIndicator(true);
-    clearTimeout(updateScannerIndicator._t);
-    updateScannerIndicator._t=setTimeout(()=>updateScannerIndicator(false),2000);
+  // Ignorar teclas especiales
+  if(e.key.length!==1||e.ctrlKey||e.metaKey||e.altKey)return;
+
+  // Si está en un input que NO es caja-q y NO es un modal cerrado, dejar escribir normal
+  // PERO si llega muy rápido (escáner), capturarlo igual
+  const now=Date.now();
+  const timeSinceLast=now-lastScanTime;
+  lastScanTime=now;
+
+  // Heurística: escáner escribe <50ms entre caracteres, humano >150ms
+  const esEscaner=timeSinceLast<80||scanBuffer.length>0;
+
+  if(!esEscaner&&(tag==='INPUT'||tag==='TEXTAREA')&&activeId!=='caja-q'){
+    scanBuffer=''; // resetear buffer si humano escribe en input
+    return;
+  }
+
+  scanBuffer+=e.key;
+  clearTimeout(scanTimer);
+  scanTimer=setTimeout(()=>{scanBuffer='';},200);
+
+  // Mostrar indicador
+  updateScannerIndicator(true);
+  clearTimeout(updateScannerIndicator._t);
+  updateScannerIndicator._t=setTimeout(()=>updateScannerIndicator(false),2000);
+
+  // Si está en caja-q, prevenir que escriba ahí (el escáner maneja el código)
+  if(activeId==='caja-q'&&esEscaner){
+    e.preventDefault();
   }
 }
 function updateScannerIndicator(active){
@@ -1053,10 +1122,21 @@ function addToTicket(id){
   const p=S.productos.find(x=>x.id===id);if(!p)return;
   const ex=ticketItems.find(i=>i.prodId===id);
   const enTicket=ex?ex.qty:0;
-  if(p.stock-enTicket<=0){showToast('Sin stock disponible','err');return;}
+  const disponible=p.stock-enTicket;
+  if(disponible<=0){
+    showToast(`⛔ Sin stock — ${p.nombre} agotado`,'err');
+    // Flash visual en tarjeta
+    const cards=document.querySelectorAll('.pc');
+    cards.forEach(c=>{if(c.getAttribute('onclick')?.includes(id)){c.style.outline='2px solid var(--red)';setTimeout(()=>c.style.outline='',800);}});
+    return;
+  }
   if(ex)ex.qty++;
   else ticketItems.push({prodId:id,nombre:p.nombre,precio:p.precio,costo:p.costo,qty:1});
-  if(p.stock-enTicket===1)showToast(`⚠️ Última unidad de ${p.nombre}`,'warn');
+  if(disponible===1){
+    showToast(`⚠️ ÚLTIMA UNIDAD de ${p.nombre} — queda 0 en stock`,'warn');
+  } else if(disponible-1<=p.stockMin){
+    showToast(`⚠️ Stock bajo: ${p.nombre} — quedan ${disponible-1}`,'warn');
+  }
   renderTicket();
 }
 function renderTicket(){
@@ -1649,9 +1729,271 @@ function exportReporte(){
   XLSX.writeFile(wb,`reporte_${anio}_${mes+1}.xlsx`);
 }
 
+// ── LIBRO CONTABLE ─────────────────────────────────────────────────────────
+let libroTab='todo';
+function setLibroTab(tab,btn){libroTab=tab;document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));btn.classList.add('active');renderLibro();}
+
+function renderLibro(){
+  const mes=parseInt(document.getElementById('lib-mes')?.value||new Date().getMonth());
+  const anio=parseInt(document.getElementById('lib-anio')?.value||new Date().getFullYear());
+  const filFecha=v=>{const d=new Date(v+'T12:00:00');return d.getMonth()===mes&&d.getFullYear()===anio;};
+
+  // Construir lista unificada de transacciones
+  const rows=[];
+
+  // INGRESOS: ventas
+  S.ventas.filter(v=>filFecha(v.fecha)).forEach(v=>{
+    const detalle=v.items?v.items.map(i=>`${i.nombre} ×${i.qty} @${fmt(i.precio)}`).join(' | '):'—';
+    rows.push({fecha:v.fecha,hora:v.hora||'00:00',tipo:'INGRESO',tipoClass:'c-grn',concepto:'Venta de mercancía',detalle,responsable:v.vendidoPor||'—',metodo:v.metodoPago||'Efectivo',ingreso:v.total,egreso:0,_ts:v.fecha+'T'+(v.hora||'00:00')});
+  });
+
+  // FIADOS cobrados como ingreso
+  S.fiados.filter(f=>f.pagado&&f.fechaPago&&filFecha(f.fechaPago)).forEach(f=>{
+    rows.push({fecha:f.fechaPago,hora:f.hora||'00:00',tipo:'INGRESO',tipoClass:'c-grn',concepto:'Cobro fiado — '+f.cliente,detalle:f.items?f.items.map(i=>i.nombre).join(', '):'—',responsable:f.vendidoPor||'—',metodo:'Efectivo',ingreso:f.total,egreso:0,_ts:f.fechaPago+'T00:00'});
+  });
+
+  // EGRESOS: gastos
+  S.gastos.filter(g=>filFecha(g.fecha)).forEach(g=>{
+    rows.push({fecha:g.fecha,hora:'—',tipo:'EGRESO',tipoClass:'c-red',concepto:'Gasto: '+g.categoria,detalle:g.descripcion,responsable:g.registradoPor||'—',metodo:'—',ingreso:0,egreso:g.monto,_ts:g.fecha+'T00:00'});
+  });
+
+  // EGRESOS: pagos (proveedores, servicios, etc)
+  S.pagos.filter(p=>filFecha(p.fecha)).forEach(p=>{
+    const concepto=p.categoria==='Proveedor'?`Pago proveedor: ${p.proveedor||'—'}`:`Pago: ${p.categoria}`;
+    rows.push({fecha:p.fecha,hora:'—',tipo:'COMPRA/PAGO',tipoClass:'c-amb',concepto,detalle:p.descripcion+(p.notas?' — '+p.notas:''),responsable:p.registradoPor||'—',metodo:p.metodo||'—',ingreso:0,egreso:p.monto,_ts:p.fecha+'T00:00'});
+  });
+
+  // Ordenar por fecha y hora
+  rows.sort((a,b)=>a._ts.localeCompare(b._ts));
+
+  // Filtrar por tab
+  const filtrados=libroTab==='todo'?rows:libroTab==='ingresos'?rows.filter(r=>r.ingreso>0):libroTab==='egresos'?rows.filter(r=>r.egreso>0&&r.tipo==='EGRESO'):rows.filter(r=>r.tipo==='COMPRA/PAGO');
+
+  // Calcular totales
+  const totIng=rows.filter(r=>r.ingreso>0).reduce((s,r)=>s+r.ingreso,0);
+  const totEgr=rows.filter(r=>r.egreso>0).reduce((s,r)=>s+r.egreso,0);
+  document.getElementById('lib-ing').textContent=fmt(totIng);
+  document.getElementById('lib-egr').textContent=fmt(totEgr);
+  document.getElementById('lib-util').textContent=fmt(totIng-totEgr);
+  document.getElementById('lib-util').className='sc-val mono '+(totIng-totEgr>=0?'c-grn':'c-red');
+  document.getElementById('lib-trans').textContent=rows.length;
+  document.getElementById('lib-count').textContent=filtrados.length+' registros';
+
+  // Saldo acumulado
+  let saldo=0;
+  const tbody=document.getElementById('lib-tbody');
+  if(!filtrados.length){tbody.innerHTML='<tr><td colspan="10" class="empty">Sin registros en este período</td></tr>';return;}
+  tbody.innerHTML=filtrados.map(r=>{
+    saldo+=r.ingreso-r.egreso;
+    const tipoBadge=r.tipo==='INGRESO'?'bg':r.tipo==='EGRESO'?'br':'ba';
+    return `<tr>
+      <td style="white-space:nowrap">${r.fecha}</td>
+      <td style="color:var(--t3)">${r.hora}</td>
+      <td><span class="badge ${tipoBadge}">${r.tipo}</span></td>
+      <td style="font-size:12px;font-weight:500">${r.concepto}</td>
+      <td style="font-size:11px;color:var(--t2);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.detalle}">${r.detalle}</td>
+      <td style="font-size:11px;color:var(--t2)">${r.responsable}</td>
+      <td style="font-size:11px">${r.metodo}</td>
+      <td class="mono ${r.ingreso>0?'c-grn':''}">${r.ingreso>0?fmt(r.ingreso):'—'}</td>
+      <td class="mono ${r.egreso>0?'c-red':''}">${r.egreso>0?fmt(r.egreso):'—'}</td>
+      <td class="mono ${saldo>=0?'c-grn':'c-red'}" style="font-weight:600">${fmt(saldo)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function exportLibro(){
+  if(!window.XLSX)return;
+  const mes=parseInt(document.getElementById('lib-mes')?.value||new Date().getMonth());
+  const anio=parseInt(document.getElementById('lib-anio')?.value||new Date().getFullYear());
+  const filFecha=v=>{const d=new Date(v+'T12:00:00');return d.getMonth()===mes&&d.getFullYear()===anio;};
+  const meses=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const wb=XLSX.utils.book_new();
+
+  // Hoja 1: Libro diario completo
+  const rows=[];
+  S.ventas.filter(v=>filFecha(v.fecha)).forEach(v=>{
+    if(v.items)v.items.forEach(i=>rows.push({Fecha:v.fecha,Hora:v.hora||'',Tipo:'INGRESO - VENTA',Concepto:'Venta de mercancía',Producto:i.nombre,Cantidad:i.qty,'Precio Unitario':i.precio,'Costo Unitario':i.costo,Subtotal:i.precio*i.qty,'Costo Total':i.costo*i.qty,Utilidad:(i.precio-i.costo)*i.qty,'Método Pago':v.metodoPago||'Efectivo',Responsable:v.vendidoPor||'',Notas:v.notas||''}));
+    else rows.push({Fecha:v.fecha,Hora:v.hora||'',Tipo:'INGRESO - VENTA',Concepto:'Venta de mercancía',Producto:'—',Cantidad:1,'Precio Unitario':v.total,'Costo Unitario':v.costoTotal,Subtotal:v.total,'Costo Total':v.costoTotal,Utilidad:v.total-v.costoTotal,'Método Pago':v.metodoPago||'Efectivo',Responsable:v.vendidoPor||'',Notas:v.notas||''});
+  });
+  S.gastos.filter(g=>filFecha(g.fecha)).forEach(g=>{
+    rows.push({Fecha:g.fecha,Hora:'',Tipo:'EGRESO - GASTO',Concepto:g.categoria,Producto:g.descripcion,Cantidad:1,'Precio Unitario':0,'Costo Unitario':g.monto,Subtotal:0,'Costo Total':g.monto,Utilidad:-g.monto,'Método Pago':'—',Responsable:g.registradoPor||'',Notas:''});
+  });
+  S.pagos.filter(p=>filFecha(p.fecha)).forEach(p=>{
+    const tipo=p.categoria==='Proveedor'?`EGRESO - PAGO PROVEEDOR (${p.proveedor||'—'})`:`EGRESO - ${p.categoria.toUpperCase()}`;
+    rows.push({Fecha:p.fecha,Hora:'',Tipo:tipo,Concepto:p.descripcion,Producto:p.notas||p.descripcion,Cantidad:1,'Precio Unitario':0,'Costo Unitario':p.monto,Subtotal:0,'Costo Total':p.monto,Utilidad:-p.monto,'Método Pago':p.metodo||'',Responsable:p.registradoPor||'',Notas:''});
+  });
+  rows.sort((a,b)=>a.Fecha.localeCompare(b.Fecha));
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),`Libro ${meses[mes]}`);
+
+  // Hoja 2: Resumen financiero
+  const tv=S.ventas.filter(v=>filFecha(v.fecha)).reduce((s,v)=>s+v.total,0);
+  const tc=S.ventas.filter(v=>filFecha(v.fecha)).reduce((s,v)=>s+v.costoTotal,0);
+  const tg=S.gastos.filter(g=>filFecha(g.fecha)).reduce((s,g)=>s+g.monto,0);
+  const tp=S.pagos.filter(p=>filFecha(p.fecha)).reduce((s,p)=>s+p.monto,0);
+  const resumen=[
+    {Concepto:'INGRESOS','':''},{Concepto:'Ventas brutas',Valor:tv},
+    {Concepto:'','':''},{Concepto:'EGRESOS','':''},
+    {Concepto:'Costo de ventas',Valor:tc},
+    {Concepto:'Gastos operativos',Valor:tg},
+    {Concepto:'Pagos a proveedores y servicios',Valor:tp},
+    {Concepto:'Total egresos',Valor:tc+tg+tp},
+    {Concepto:'','':''},{Concepto:'RESULTADO','':''},
+    {Concepto:'Utilidad bruta (ventas - costo)',Valor:tv-tc},
+    {Concepto:'Utilidad neta (ventas - todos los egresos)',Valor:tv-tc-tg-tp},
+    {Concepto:'Margen neto %',Valor:tv>0?((tv-tc-tg-tp)/tv*100).toFixed(2)+'%':'0%'},
+  ];
+  // Desglose pagos por proveedor
+  const porProv={};
+  S.pagos.filter(p=>filFecha(p.fecha)&&p.categoria==='Proveedor'&&p.proveedor).forEach(p=>{porProv[p.proveedor]=(porProv[p.proveedor]||0)+p.monto;});
+  if(Object.keys(porProv).length){
+    resumen.push({Concepto:'','':''},{Concepto:'PAGOS POR PROVEEDOR','':''});
+    Object.entries(porProv).forEach(([pr,m])=>resumen.push({Concepto:pr,Valor:m}));
+  }
+  // Desglose por método de pago
+  const porMetodo={};
+  S.ventas.filter(v=>filFecha(v.fecha)).forEach(v=>{const m=v.metodoPago||'Efectivo';porMetodo[m]=(porMetodo[m]||0)+v.total;});
+  if(Object.keys(porMetodo).length){
+    resumen.push({Concepto:'','':''},{Concepto:'VENTAS POR MÉTODO DE PAGO','':''});
+    Object.entries(porMetodo).forEach(([m,v])=>resumen.push({Concepto:m,Valor:v}));
+  }
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(resumen),'Resumen financiero');
+
+  // Hoja 3: Solo ventas con detalle de productos
+  const ventasDetalle=[];
+  S.ventas.filter(v=>filFecha(v.fecha)).forEach(v=>{
+    if(v.items)v.items.forEach(i=>ventasDetalle.push({Fecha:v.fecha,Hora:v.hora||'','N° Transacción':v.id?.slice(-6)||'',Producto:i.nombre,Cantidad:i.qty,'V. Unitario':i.precio,'Costo Unitario':i.costo,'V. Total':i.precio*i.qty,'Costo Total':i.costo*i.qty,'Ganancia item':(i.precio-i.costo)*i.qty,'Vendido por':v.vendidoPor||'','Método':v.metodoPago||'Efectivo','Descuento':v.descuento||0,Notas:v.notas||''}));
+  });
+  if(ventasDetalle.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(ventasDetalle),'Ventas detalladas');
+
+  // Hoja 4: Compras y pagos a proveedores
+  const compras=S.pagos.filter(p=>filFecha(p.fecha)).map(p=>({Fecha:p.fecha,Categoría:p.categoria,Proveedor:p.proveedor||'—',Descripción:p.descripcion,Concepto:p.notas||p.descripcion,'Método de pago':p.metodo||'',Monto:p.monto,'Registrado por':p.registradoPor||''}));
+  if(compras.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(compras),'Pagos y compras');
+
+  XLSX.writeFile(wb,`LibroContable_${meses[mes]}_${anio}.xlsx`);
+  showToast('Libro contable exportado ✓');
+}
+
+// ── OFFLINE — IndexedDB + sincronización pendiente ─────────────────────────
+const IDB_NAME='mitienda_offline';const IDB_VER=1;
+let idb=null;let pendingSync=[];
+
+function initIDB(){
+  return new Promise(res=>{
+    const req=indexedDB.open(IDB_NAME,IDB_VER);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      ['ventas','gastos','pagos','fiados','productos','stockHist'].forEach(store=>{
+        if(!db.objectStoreNames.contains(store))db.createObjectStore(store,{keyPath:'id'});
+      });
+      if(!db.objectStoreNames.contains('pendingSync'))db.createObjectStore('pendingSync',{keyPath:'_syncId',autoIncrement:true});
+    };
+    req.onsuccess=e=>{idb=e.target.result;res(idb);};
+    req.onerror=()=>res(null);
+  });
+}
+
+async function saveToIDB(store,data){
+  if(!idb)return;
+  return new Promise(res=>{
+    const tx=idb.transaction(store,'readwrite');
+    const s=tx.objectStore(store);
+    (Array.isArray(data)?data:[data]).forEach(item=>s.put(item));
+    tx.oncomplete=()=>res();tx.onerror=()=>res();
+  });
+}
+
+async function getFromIDB(store){
+  if(!idb)return[];
+  return new Promise(res=>{
+    const tx=idb.transaction(store,'readonly');
+    const req=tx.objectStore(store).getAll();
+    req.onsuccess=()=>res(req.result||[]);
+    req.onerror=()=>res([]);
+  });
+}
+
+async function addPendingSync(action,store,data){
+  if(!idb)return;
+  return new Promise(res=>{
+    const tx=idb.transaction('pendingSync','readwrite');
+    tx.objectStore('pendingSync').add({action,store,data,timestamp:Date.now()});
+    tx.oncomplete=()=>res();
+  });
+}
+
+async function processPendingSync(){
+  if(!idb||!navigator.onLine)return;
+  const tx=idb.transaction('pendingSync','readwrite');
+  const store=tx.objectStore('pendingSync');
+  const items=await new Promise(res=>{const r=store.getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>res([]);});
+  for(const item of items){
+    try{
+      if(item.action==='push')await window._fb.push(item.store,item.data);
+      else if(item.action==='update')await window._fb.update(item.store+'/'+item.data.id,item.data);
+      store.delete(item._syncId);
+    }catch(e){break;}
+  }
+  if(items.length>0)showToast(`✓ ${items.length} registros sincronizados`);
+}
+
+// Cuando vuelve el internet, sincronizar pendientes
+window.addEventListener('online',async()=>{
+  document.getElementById('offline-banner').classList.remove('show');
+  setSyncOk(true);
+  await processPendingSync();
+});
+
+// Override _fb.push para guardar offline si no hay internet
+const _originalPush=null;
+async function fbPushOfflineSafe(storeName,data){
+  if(navigator.onLine){
+    return window._fb.push(storeName,data);
+  }else{
+    // Sin internet: guardar localmente
+    const localId='local_'+uid();
+    const localData={...data,id:localId};
+    await saveToIDB(storeName,localData);
+    await addPendingSync('push',storeName,data);
+    // Actualizar estado local inmediatamente
+    if(window.S[storeName])window.S[storeName].push(localData);
+    window.onDataUpdate();
+    showToast('Sin internet — guardado localmente','warn');
+    return localId;
+  }
+}
+
+// Cargar datos locales si no hay internet al iniciar
+async function loadOfflineData(){
+  await initIDB();
+  if(!navigator.onLine){
+    document.getElementById('offline-banner').classList.add('show');
+    for(const k of['productos','ventas','gastos','pagos','fiados','stockHist']){
+      const local=await getFromIDB(k);
+      if(local.length>0)window.S[k]=local;
+    }
+    window.onDataUpdate();
+    showToast('Modo offline — usando datos locales','warn');
+  }
+}
+
+// Sincronizar datos de Firebase a IDB cuando llegan
+const _origOnDataUpdate=window.onDataUpdate;
+window.onDataUpdate=function(){
+  // Guardar en IDB para acceso offline
+  if(navigator.onLine&&idb){
+    ['productos','ventas','gastos','pagos','fiados','stockHist'].forEach(k=>{
+      if(window.S[k]&&window.S[k].length>0)saveToIDB(k,window.S[k]);
+    });
+  }
+  if(_origOnDataUpdate)_origOnDataUpdate();
+};
+
 // ── INIT ───────────────────────────────────────────────────────────────────
 document.getElementById('rep-mes').value=new Date().getMonth();
+document.getElementById('lib-mes').value=new Date().getMonth();
 document.getElementById('mg-fecha')&&(document.getElementById('mg-fecha').value=today());
+// Inicializar IndexedDB para modo offline
+loadOfflineData();
 </script>
 </body>
 </html>

@@ -495,16 +495,37 @@ select option{background:var(--s3)}
 
 <!-- VENTAS -->
 <div id="page-ventas" class="page">
-  <div class="ph"><div class="ph-left"><h1>Ventas</h1></div><div class="ph-right"><button class="btn btn-blu btn-sm" onclick="exportVentas()">⬇ Excel</button></div></div>
+  <div class="ph">
+    <div class="ph-left"><h1>Ventas</h1><p id="ventas-count">Cargando...</p></div>
+    <div class="ph-right">
+      <input type="date" id="v-fil-desde" onchange="renderVentas()" style="width:130px">
+      <input type="date" id="v-fil-hasta" onchange="renderVentas()" style="width:130px">
+      <select id="v-fil-metodo" onchange="renderVentas()" style="width:110px">
+        <option value="">Todos</option>
+        <option>Efectivo</option><option>Nequi</option><option>Daviplata</option><option>Breve</option>
+      </select>
+      <button class="btn btn-sec btn-sm" onclick="limpiarFiltrosVentas()">✕ Limpiar</button>
+      <button class="btn btn-blu btn-sm" onclick="exportVentas()">⬇ Excel</button>
+    </div>
+  </div>
   <div class="sg sg-3">
-    <div class="sc"><div class="sc-lbl">Total ventas</div><div class="sc-val c-grn mono" id="vt-t">$0</div></div>
+    <div class="sc"><div class="sc-lbl">Ventas filtradas</div><div class="sc-val c-grn mono" id="vt-t">$0</div></div>
     <div class="sc"><div class="sc-lbl">Costo ventas</div><div class="sc-val c-red mono" id="vt-c">$0</div></div>
     <div class="sc"><div class="sc-lbl">Utilidad bruta</div><div class="sc-val mono" id="vt-u">$0</div></div>
   </div>
-  <div class="card"><div class="tbl-wrap"><table>
-    <thead><tr><th>Fecha</th><th>Hora</th><th>Por</th><th>Método</th><th>Productos</th><th>Total</th><th>Ganancia</th><th>Notas</th><th></th></tr></thead>
-    <tbody id="t-ventas"><tr><td colspan="9" class="empty">Sin ventas</td></tr></tbody>
-  </table></div></div>
+  <div class="card">
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Hora</th><th>Por</th><th>Método</th><th>Productos</th><th>Total</th><th>Ganancia</th><th>Notas</th><th>Estado</th><th></th></tr></thead>
+      <tbody id="t-ventas"><tr><td colspan="10" class="empty">Sin ventas</td></tr></tbody>
+    </table></div>
+    <div id="ventas-paginacion" style="padding:12px 16px;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:8px">
+      <span id="ventas-pag-info" style="font-size:11px;color:var(--t2)"></span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sec btn-sm" id="btn-pag-prev" onclick="cambiarPagVentas(-1)">← Anterior</button>
+        <button class="btn btn-sec btn-sm" id="btn-pag-next" onclick="cambiarPagVentas(1)">Siguiente →</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- FIADOS -->
@@ -668,11 +689,34 @@ select option{background:var(--s3)}
       </div>
     </div>
   </div>
+  <!-- Categorías personalizables -->
   <div class="card">
-    <div class="card-hd"><span class="card-hd-t">Datos</span></div>
-    <div class="card-bd" style="display:flex;gap:10px">
-      <button class="btn btn-sec" onclick="cargarEjemplos()">Cargar datos de ejemplo</button>
-      <button class="btn btn-red" onclick="borrarTodo()">Borrar todo</button>
+    <div class="card-hd"><span class="card-hd-t">Categorías de productos</span><button class="btn btn-sec btn-xs" onclick="openModal('m-categoria')">+ Nueva categoría</button></div>
+    <div class="card-bd"><div id="cats-lista" style="display:flex;flex-wrap:wrap;gap:7px"><div class="empty" style="padding:8px">Cargando...</div></div></div>
+  </div>
+  <!-- Archivo / depuración con PIN -->
+  <div class="card" style="border-color:var(--red-bd)">
+    <div class="card-hd" style="background:var(--red-bg)"><span class="card-hd-t" style="color:var(--red)">⚠️ Zona peligrosa — requiere PIN admin</span></div>
+    <div class="card-bd">
+      <p style="font-size:12px;color:var(--t2);margin-bottom:14px">Borra registros por período. <strong>Irreversible.</strong> Productos y proveedores no se pueden borrar por período.</p>
+      <div class="fg">
+        <div class="fgrp"><label>Qué borrar</label>
+          <select id="arch-tipo" style="width:100%">
+            <option value="ventas">Ventas</option>
+            <option value="egresos">Egresos</option>
+            <option value="stockHist">Historial de stock</option>
+            <option value="cierres">Cierres de caja</option>
+            <option value="fiados">Fiados cobrados</option>
+          </select>
+        </div>
+        <div class="fgrp"><label>Borrar anteriores a</label><input type="date" id="arch-fecha"></div>
+        <div class="fgrp"><label>PIN admin (confirmación)</label><input id="arch-pin" type="password" maxlength="4" placeholder="****"></div>
+        <div class="fgrp" style="display:flex;align-items:flex-end"><button class="btn btn-red" onclick="archivarDatos()">🗑️ Borrar período</button></div>
+      </div>
+      <div style="border-top:1px solid var(--bd);margin-top:14px;padding-top:12px;display:flex;gap:10px">
+        <button class="btn btn-sec" onclick="cargarEjemplos()">Cargar ejemplos</button>
+        <button class="btn btn-red" onclick="borrarTodo()">Borrar TODO</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1056,6 +1100,16 @@ select option{background:var(--s3)}
   </div>
 </div>
 
+<div class="overlay" id="m-categoria">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-title">Nueva categoría</div>
+    <div class="fg">
+      <div class="fgrp"><label>Nombre</label><input id="mcat-nombre" placeholder="Ej: Snacks, Aseo, Congelados..."></div>
+      <div class="fgrp"><label>Emoji</label><input id="mcat-emoji" placeholder="🍬" maxlength="2" style="font-size:20px;text-align:center"></div>
+    </div>
+    <div class="fa"><button class="btn btn-sec" onclick="closeModal('m-categoria')">Cancelar</button><button class="btn btn-grn" onclick="guardarCategoria()">Crear</button></div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <!-- FIREBASE -->
@@ -1071,7 +1125,7 @@ window._fb={
   update:(p,v)=>update(ref(db,p),v),
   listen:(p,cb)=>{const r=ref(db,p);onValue(r,s=>cb(s.val()));return()=>off(r);}
 };
-['productos','ventas','egresos','stockHist','proveedores','cierres','fiados','ordenes','ofertas','presupuestos','cuadres','config'].forEach(k=>{
+['productos','ventas','egresos','stockHist','proveedores','cierres','fiados','ordenes','ofertas','presupuestos','cuadres','categorias','config'].forEach(k=>{
   window._fb.listen(k,val=>{
     if(k==='config'){if(val)window.S.config={...window.S.config,...val};}
     else window.S[k]=val?Object.entries(val).map(([id,v])=>({...v,id})):[];
@@ -1084,7 +1138,7 @@ setSyncOk(true);
 
 <script>
 // ── STATE ──────────────────────────────────────────────────────────────────
-window.S={productos:[],ventas:[],egresos:[],stockHist:[],proveedores:[],cierres:[],fiados:[],ordenes:[],ofertas:[],presupuestos:[],cuadres:[],config:{nombre:'Mini Mercado Claro Azul',stockMin:5,pinAdmin:'1234',pinColab:'0000'}};
+window.S={productos:[],ventas:[],egresos:[],stockHist:[],proveedores:[],cierres:[],fiados:[],ordenes:[],ofertas:[],presupuestos:[],cuadres:[],categorias:[],config:{nombre:'Mini Mercado Claro Azul',stockMin:5,pinAdmin:'1234',pinColab:'0000'}};
 let currentUser=null,currentPeriod='hoy',activePage='dashboard';
 let ticketItems=[],metodoPago='Efectivo',esFiado=false,descuento=0;
 let cajaFiltCat='Todos',stockFilter='todo',libroTab='todo';
@@ -1164,6 +1218,7 @@ window.onDataUpdate=function(){
   else if(p==='libro')renderLibro();
   else if(p==='proveedores')renderProveedores();
   else if(p==='cierres')renderCierres();
+  else if(p==='configuracion')renderConfigCats();
 };
 
 function updateBadges(){
@@ -1396,6 +1451,7 @@ function openModal(id){
     document.getElementById('mp2-ganancia').value=pres.metaGanancia||'';
     document.getElementById('mp2-caja').value=pres.cajaFondo||'';
   }
+  if(id==='m-categoria'){document.getElementById('mcat-nombre').value='';document.getElementById('mcat-emoji').value='';}
   const el=document.getElementById(id);
   if(!el){console.warn('Modal no encontrado:',id);return;}
   el.classList.add('open');
@@ -1404,8 +1460,6 @@ function openModal(id){
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open'));});
-function closeModal(id){document.getElementById(id).classList.remove('open');}
-document.querySelectorAll('.overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(o=>o.classList.remove('open'));});
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
@@ -1424,8 +1478,8 @@ function renderDash(){
   document.getElementById('d-mg').textContent=mg+'%';
   document.getElementById('d-gs').textContent=fmt(te);
   // Alertas stock
-  const alts=S.productos.filter(p=>p.stock<=p.stockMin);
-  document.getElementById('d-alerts').innerHTML=alts.map(p=>`<div class="al ${p.stock===0?'crit':'warn'}"><span>${p.stock===0?'⛔':'⚠️'}</span><div class="al-txt"><strong>${p.nombre}</strong> — ${p.stock===0?'AGOTADO':`Stock: ${p.stock} (mín: ${p.stockMin})`}</div><button class="btn btn-xs btn-sec" onclick="openAjusteProd('${p.id}')">Reponer</button></div>`).join('');
+  const alts=[...new Map(S.productos.filter(p=>p.stock<=p.stockMin).map(p=>[p.id,p])).values()];
+  document.getElementById('d-alerts').innerHTML=alts.slice(0,5).map(p=>`<div class="al ${p.stock===0?'crit':'warn'}"><span>${p.stock===0?'⛔':'⚠️'}</span><div class="al-txt"><strong>${p.nombre}</strong> — ${p.stock===0?'AGOTADO':`Stock: ${p.stock} (mín: ${p.stockMin})`}</div><button class="btn btn-xs btn-sec" onclick="openAjusteProd('${p.id}')">Reponer</button></div>`).join('')+(alts.length>5?`<div style="font-size:11px;color:var(--t2);padding:4px 8px">... y ${alts.length-5} más en Inventario</div>`:'');
   // Recientes
   const rec=[...S.ventas].sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.hora?.localeCompare(a.hora||'')).slice(0,8);
   document.getElementById('d-recientes').innerHTML=rec.length?
@@ -1679,24 +1733,68 @@ function aplicarPaca(){
 }
 
 // ── VENTAS ─────────────────────────────────────────────────────────────────
-function renderVentas(){
-  const tv=S.ventas.reduce((s,v)=>s+v.total,0),tc=S.ventas.reduce((s,v)=>s+v.costoTotal,0);
-  document.getElementById('vt-t').textContent=fmt(tv);document.getElementById('vt-c').textContent=fmt(tc);
+// Ventas state
+const PAG_VENTAS=25;let pagVentasIdx=0;let ventasFiltrada=[];
+function renderVentas(){filterAndRenderVentas();}
+function filterAndRenderVentas(){
+  pagVentasIdx=0;
+  const desde=document.getElementById('v-fil-desde')?.value||'';
+  const hasta=document.getElementById('v-fil-hasta')?.value||'';
+  const metodo=document.getElementById('v-fil-metodo')?.value||'';
+  const estado=document.getElementById('v-estado')?.value||'';
+  ventasFiltrada=[...S.ventas].filter(v=>{
+    if(desde&&v.fecha<desde)return false;
+    if(hasta&&v.fecha>hasta)return false;
+    if(metodo&&v.metodoPago!==metodo)return false;
+    if(estado==='activa'&&v.anulada)return false;
+    if(estado==='anulada'&&!v.anulada)return false;
+    return true;
+  }).sort((a,b)=>b.fecha.localeCompare(a.fecha)||b.hora?.localeCompare(a.hora||''));
+  renderVentasPage();
+}
+function renderVentasPage(){
+  const total=ventasFiltrada.length;const pages=Math.ceil(total/PAG_VENTAS)||1;
+  if(pagVentasIdx>=pages)pagVentasIdx=pages-1;
+  const slice=ventasFiltrada.slice(pagVentasIdx*PAG_VENTAS,(pagVentasIdx+1)*PAG_VENTAS);
+  const activas=ventasFiltrada.filter(v=>!v.anulada);
+  const tv=activas.reduce((s,v)=>s+v.total,0),tc=activas.reduce((s,v)=>s+v.costoTotal,0);
+  document.getElementById('vt-t').textContent=fmt(tv);
+  document.getElementById('vt-c').textContent=fmt(tc);
   document.getElementById('vt-u').textContent=fmt(tv-tc);
   document.getElementById('vt-u').className='sc-val mono '+(tv-tc>=0?'c-grn':'c-red');
-  const sorted=[...S.ventas].sort((a,b)=>b.fecha.localeCompare(a.fecha));
-  document.getElementById('t-ventas').innerHTML=sorted.length?sorted.map(v=>`<tr>
+  document.getElementById('ventas-count').textContent=`${total} ventas — ${fmt(tv)}`;
+  document.getElementById('ventas-pag-info').textContent=total>PAG_VENTAS?`Página ${pagVentasIdx+1} de ${pages} — ${total} total`:`${total} ventas`;
+  document.getElementById('btn-pag-prev').disabled=pagVentasIdx===0;
+  document.getElementById('btn-pag-next').disabled=pagVentasIdx>=pages-1;
+  document.getElementById('t-ventas').innerHTML=slice.length?slice.map(v=>`<tr style="${v.anulada?'opacity:.5':''}">
     <td>${v.fecha}</td><td style="color:var(--t3)">${v.hora||'—'}</td>
     <td><span class="badge ${v.vendidoPor==='Admin'?'bp':'bb'}">${v.vendidoPor||'—'}</span></td>
     <td>${v.metodoPago||'—'}</td>
-    <td style="font-size:10px;color:var(--t2);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.items?v.items.map(i=>`${i.nombre}×${i.qty}`).join(', '):''}</td>
-    <td class="mono c-grn">${fmt(v.total)}</td>
-    <td class="mono ${v.total-v.costoTotal>=0?'c-grn':'c-red'}">${fmt(v.total-v.costoTotal)}</td>
+    <td style="font-size:10px;color:var(--t2);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.items?v.items.map(i=>`${i.nombre}×${i.qty}`).join(', '):''}</td>
+    <td class="mono ${v.anulada?'':'c-grn'}">${fmt(v.total)}</td>
+    <td class="mono ${v.total-v.costoTotal>=0&&!v.anulada?'c-grn':'c-red'}">${fmt(v.total-v.costoTotal)}</td>
     <td style="font-size:10px;color:var(--t2)">${v.notas||'—'}</td>
-    <td><button class="btn btn-red btn-xs" onclick="delVenta('${v.id}')">✕</button></td>
-  </tr>`).join(''):'<tr><td colspan="9" class="empty">Sin ventas</td></tr>';
+    <td>${v.anulada?'<span class="badge br">Anulada</span>':'<span class="badge bg">Activa</span>'}</td>
+    <td style="white-space:nowrap">
+      ${!v.anulada?`<button class="btn btn-amb btn-xs" onclick="reversarVenta('${v.id}')">↩ Reversar</button>`:''}
+      <button class="btn btn-red btn-xs" onclick="delVenta('${v.id}')">✕</button>
+    </td>
+  </tr>`).join(''):'<tr><td colspan="10" class="empty">Sin ventas</td></tr>';
 }
-async function delVenta(id){if(!confirm('¿Eliminar?'))return;await fbSafe('remove','ventas/'+id);showToast('Eliminado');}
+function pagVentas(d){pagVentasIdx=Math.max(0,Math.min(Math.ceil(ventasFiltrada.length/PAG_VENTAS)-1,pagVentasIdx+d));renderVentasPage();}
+function cambiarPagVentas(d){pagVentas(d);}
+function limpiarFiltrosVentas(){['v-fil-desde','v-fil-hasta','v-fil-metodo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});filterAndRenderVentas();}
+async function reversarVenta(id){
+  if(!confirm('¿Reversar esta venta?\n• Se devolverá el stock de cada producto\n• La venta quedará marcada como anulada\n• Queda registro de la anulación'))return;
+  const v=S.ventas.find(x=>x.id===id);if(!v||v.anulada)return;
+  for(const item of(v.items||[])){
+    const p=S.productos.find(x=>x.id===item.prodId);
+    if(p){const ant=p.stock,nw=ant+item.qty;await fbSafe('update','productos/'+p.id,{stock:nw});await fbSafe('push','stockHist',{prodId:p.id,nombre:p.nombre,antes:ant,despues:nw,delta:item.qty,motivo:'Venta revertida',fecha:today(),vendidoPor:currentUser==='admin'?'Admin':'Colaborador'});}
+  }
+  await fbSafe('update','ventas/'+id,{anulada:true,fechaAnulacion:today(),anuladaPor:currentUser==='admin'?'Admin':'Colaborador'});
+  showToast('✓ Venta revertida — stock devuelto');
+}
+async function delVenta(id){if(!confirm('¿Eliminar permanentemente?'))return;await fbSafe('remove','ventas/'+id);showToast('Eliminado');}
 
 // ── FIADOS ─────────────────────────────────────────────────────────────────
 function renderFiados(){
@@ -2490,6 +2588,46 @@ function renderCuadresHistorial(){
     `<table><thead><tr><th>Fecha</th><th>Hora</th><th>Contado</th><th>Sistema</th><th>Diferencia</th><th>Por</th></tr></thead><tbody>`+
     sorted.map(c=>`<tr><td>${c.fecha}</td><td style="color:var(--t3)">${c.hora||'—'}</td><td class="mono c-grn">${fmt(c.totalContado)}</td><td class="mono">${fmt(c.ventasEfectivo)}</td><td class="mono ${c.diferencia===0?'c-grn':c.diferencia>0?'c-amb':'c-red'}">${c.diferencia>=0?'+':''}${fmt(c.diferencia)}</td><td>${c.cuadradoPor||'—'}</td></tr>`).join('')+`</tbody></table>`:
     '<div class="empty">Sin cuadres guardados</div>';
+}
+
+// ── CATEGORÍAS PERSONALIZABLES ─────────────────────────────────────────────
+function getCats(){
+  const base=[{nombre:'Alimentos',emoji:'🍔'},{nombre:'Bebidas',emoji:'🥤'},{nombre:'Lácteos',emoji:'🥛'},{nombre:'Chocolates',emoji:'🍫'},{nombre:'Peluches',emoji:'🧸'},{nombre:'Papelería',emoji:'✏️'},{nombre:'Otro',emoji:'📦'}];
+  return [...base,...(S.categorias||[]).filter(c=>!base.find(b=>b.nombre===c.nombre))];
+}
+function catEmoji2(nombre){const c=getCats().find(x=>x.nombre===nombre);return c?c.emoji:'📦';}
+function refreshCatSelects(){
+  const cats=getCats().map(c=>c.nombre);
+  ['mp-cat'].forEach(id=>{const el=document.getElementById(id);if(!el)return;const prev=el.value;el.innerHTML=cats.map(c=>`<option value="${c}">${catEmoji2(c)} ${c}</option>`).join('');if(prev)el.value=prev;});
+}
+function renderConfigCats(){
+  const base=['Alimentos','Bebidas','Lácteos','Chocolates','Peluches','Papelería','Otro'];
+  const todas=getCats();
+  const el=document.getElementById('cats-lista');if(!el)return;
+  el.innerHTML=todas.map(c=>{const esBase=base.includes(c.nombre);return`<div style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:20px;border:1px solid ${esBase?'var(--bd2)':'var(--grn-bd)'};background:${esBase?'var(--s2)':'var(--grn-bg)'};font-size:12px">${c.emoji} ${c.nombre}${!esBase&&c.id?`<button onclick="delCategoria('${c.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕</button>`:''}</div>`;}).join('');
+}
+async function guardarCategoria(){
+  const nombre=document.getElementById('mcat-nombre').value.trim();const emoji=document.getElementById('mcat-emoji').value.trim()||'📦';
+  if(!nombre){showToast('Escribe el nombre','warn');return;}
+  if(getCats().find(c=>c.nombre===nombre)){showToast('Esa categoría ya existe','warn');return;}
+  await fbSafe('push','categorias',{nombre,emoji});
+  closeModal('m-categoria');showToast('Categoría creada ✓');renderConfigCats();refreshCatSelects();
+}
+async function delCategoria(id){if(!confirm('¿Eliminar categoría?'))return;await fbSafe('remove','categorias/'+id);renderConfigCats();refreshCatSelects();}
+
+// ── ARCHIVAR DATOS ─────────────────────────────────────────────────────────
+async function archivarDatos(){
+  const tipo=document.getElementById('arch-tipo').value;
+  const fecha=document.getElementById('arch-fecha').value;
+  const pin=document.getElementById('arch-pin').value;
+  if(!fecha){showToast('Selecciona una fecha límite','warn');return;}
+  if(pin!==(S.config.pinAdmin||'1234')){showToast('PIN incorrecto','err');document.getElementById('arch-pin').value='';return;}
+  const registros=(window.S[tipo]||[]).filter(r=>(r.fecha||r.fechaPago||'')&&(r.fecha||r.fechaPago||'')<fecha);
+  if(!registros.length){showToast('No hay registros anteriores a esa fecha','warn');return;}
+  if(!confirm(`¿Borrar ${registros.length} registro(s) de "${tipo}" anteriores al ${fecha}?\n⚠️ Irreversible.`))return;
+  for(const r of registros)await fbSafe('remove',tipo+'/'+r.id);
+  document.getElementById('arch-pin').value='';
+  showToast(`✓ ${registros.length} registro(s) eliminados`);
 }
 
 // ── INIT ───────────────────────────────────────────────────────────────────
